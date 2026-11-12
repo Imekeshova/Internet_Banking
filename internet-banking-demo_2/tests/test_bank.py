@@ -351,11 +351,10 @@ class BankSystemChecks(unittest.TestCase):
                 self.assertEqual(self.balance(acc), start + inc - out, f"account {acc} does not reconcile")
             self.assertEqual(db.execute("SELECT SUM(balance_cents) FROM accounts").fetchone()[0], sum(opening.values()))
 
-    # =====================================================================
-    # BONUS - known bugs found in code review (expected to FAIL today).
-    # After you fix server.py these will report "unexpected success":
-    # then just delete the @unittest.expectedFailure line above the test.
-    # =====================================================================
+
+
+
+
     @unittest.expectedFailure
     def test_21_BUG_next_id_matches_accepted_reference_format(self):
         """/api/next-id returns TR-<10 hex> but POST /api/transfers requires TR-<32 hex>."""

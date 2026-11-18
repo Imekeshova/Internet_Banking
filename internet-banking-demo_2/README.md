@@ -1,6 +1,6 @@
 # Internet Banking Demo
 
-A local educational banking demo with customer registration and sign-in, account ownership checks, internal transfers, transfer status lookup, and printable digital receipts. The database and sample accounts remain local to this folder. No real money is moved.
+A local educational banking demo with customer registration and sign-in, account ownership checks, internal and scheduled transfers, transfer detail views, readable audit events, and printable digital receipts. The database and sample accounts remain local to this folder. No real money is moved.
 
 ## Run on Windows
 
@@ -14,7 +14,7 @@ A local educational banking demo with customer registration and sign-in, account
 3. Open [http://127.0.0.1:8000](http://127.0.0.1:8000).
 4. Stop the server with **Ctrl+C**.
 
-You can also double-click `start.bat`. The app creates or upgrades `banking.sqlite3` at startup and preserves existing demo balances and transfer history. To reset the entire demo, stop the server and remove `banking.sqlite3`.
+You can also double-click `start.bat`. The app creates or upgrades `banking.sqlite3` at startup and preserves existing demo balances and transfer history. To reset the entire demo, stop the server and remove `banking.sqlite3`. Set `BANK_PORT` to choose another local port or `BANK_DB` to use a different database path.
 
 ## Demo sign-ins
 
@@ -27,6 +27,8 @@ All three original sample accounts use the same demo password, `DemoPass!23`.
 | Amina K. | `amina@example.test` | ₸75,000.00 |
 
 You can also create a new local account from the sign-in screen. New accounts start with a zero balance. Use the sample accounts to send a demo transfer to a newly registered account.
+
+On a fresh database, the completed example transfer moves ₸10,000 from Aruzhan to Dias, so their visible balances become ₸90,000 and ₸35,000. The failed ₸150,000 example does not change either balance.
 
 ## Sign-in and session behavior
 
@@ -49,6 +51,12 @@ Defaults can be changed with environment variables before launching the server:
 The daily total includes Pending and Completed outgoing transfers across the customer’s accounts; Failed transfers do not count. The app shows the limit, amount used today, and remaining amount. Amount and limit checks are enforced by the server, not only by browser controls.
 
 Each transfer stores a unique reference and an optional description of up to 200 characters. A submitted transfer is first saved as Pending. A background worker then checks funds and atomically updates both balances, setting the status to Completed; if funds are insufficient, it sets Failed without moving money. A retry with the same reference and identical details returns the existing transfer. Reusing the reference with changed details is rejected. Pending records are resumed after a server restart.
+
+Transfer references in Recent Activity are clickable. Selecting one opens transfer details in a pop-up dialog with the description, amount, recipient, reference, latest status, last checked time, and any failure reason or scheduled time. A fresh database is seeded with one completed ₸10,000 example and one failed ₸150,000 insufficient-funds example so both detail states can be demonstrated. Existing databases are not given extra sample transfers.
+
+Choose **Schedule for later** to set a future date and time in UTC+5 and add a reminder note such as “Send money to Aigul for utility bills.” Scheduled transfers appear in Recent Activity and can be cancelled while their status is Scheduled. At the scheduled time, the server checks the current balance, amount limits, and that day’s remaining limit. It executes the transfer only if all checks pass; otherwise, it marks the schedule Failed and records the reason. Scheduled entries resume after a server restart.
+
+The Audit Log button appears only when signed in as `aruzhan@example.test`. Clicking it opens the log; clicking it again hides the log. The server also rejects audit-log requests from every other account. The log lists readable records for sign-in, sign-out, transfer submission, retries, transfer completion or failure, scheduled-transfer creation or cancellation, transfer detail views, and rejected transfer-limit attempts.
 
 ## Demo scope
 

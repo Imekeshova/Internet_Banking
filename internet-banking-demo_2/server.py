@@ -15,7 +15,7 @@ from decimal import Decimal, InvalidOperation
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parent
 DB_PATH = Path(os.environ.get("BANK_DB", ROOT / "banking.sqlite3"))
@@ -28,6 +28,9 @@ MIN_TRANSFER_CENTS = int(os.environ.get("BANK_MIN_TRANSFER_KZT", "100")) * CENT
 MAX_TRANSFER_CENTS = int(os.environ.get("BANK_MAX_TRANSFER_KZT", "1000000")) * CENT
 DAILY_LIMIT_CENTS = int(os.environ.get("BANK_DAILY_LIMIT_KZT", "2000000")) * CENT
 TRANSFER_DELAY_SECONDS = int(os.environ.get("BANK_PENDING_SECONDS", "3"))
+SCHEDULE_MIN_SECONDS = 30
+SCHEDULE_MAX_DAYS = 365
+KZ_TIMEZONE = timezone(timedelta(hours=5))
 DB_LOCK = threading.Lock()
 
 
@@ -102,9 +105,32 @@ def init_db() -> None:
             created_at TEXT NOT NULL,
             checked_at TEXT NOT NULL,
             failure_reason TEXT,
-            description TEXT NOT NULL DEFAULT ''
+            description TEXT NOT NULL DEFAULT '',
+            scheduled_for TEXT
         );
         CREATE TABLE IF NOT EXISTS request_ids (request_id TEXT PRIMARY KEY, reserved_at TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS scheduled_transfers (
+            request_id TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            sender_account_id INTEGER NOT NULL REFERENCES accounts(id),
+            recipient_account_id INTEGER NOT NULL REFERENCES accounts(id),
+            amount_cents INTEGER NOT NULL CHECK(amount_cents > 0),
+            scheduled_for TEXT NOT NULL,
+            reminder_note TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL CHECK(status IN ('Scheduled','Cancelled','Completed','Failed')),
+            failure_reason TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            actor_user_id INTEGER REFERENCES users(id),
+            action TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id TEXT NOT NULL,
+            details TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS sessions (
             session_id TEXT PRIMARY KEY,
             user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -114,6 +140,8 @@ def init_db() -> None:
         CREATE INDEX IF NOT EXISTS transfers_sender_created ON transfers(sender_account_id, created_at DESC);
         CREATE INDEX IF NOT EXISTS transfers_recipient_created ON transfers(recipient_account_id, created_at DESC);
         CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires_at);
+        CREATE INDEX IF NOT EXISTS scheduled_due ON scheduled_transfers(status,scheduled_for);
+        CREATE INDEX IF NOT EXISTS audit_by_actor ON audit_logs(actor_user_id,created_at DESC);
         """)
 
         # Upgrade databases created by the earlier demo without discarding account or transfer data.
@@ -123,8 +151,11 @@ def init_db() -> None:
         transfer_columns = table_columns(db, "transfers")
         if "description" not in transfer_columns:
             db.execute("ALTER TABLE transfers ADD COLUMN description TEXT NOT NULL DEFAULT ''")
+        if "scheduled_for" not in transfer_columns:
+            db.execute("ALTER TABLE transfers ADD COLUMN scheduled_for TEXT")
 
-        if db.execute("SELECT COUNT(*) FROM customers").fetchone()[0] == 0:
+        seed_sample_accounts = db.execute("SELECT COUNT(*) FROM customers").fetchone()[0] == 0
+        if seed_sample_accounts:
             db.executemany("INSERT INTO customers(id,name,account_number) VALUES(?,?,?)", [
                 (1, "Aruzhan S.", "KZ•• 1042"), (2, "Dias T.", "KZ•• 8821"), (3, "Amina K.", "KZ•• 3307")
             ])
@@ -151,6 +182,18 @@ def init_db() -> None:
             user_id = db.execute("SELECT id FROM users WHERE email=? COLLATE NOCASE", (email,)).fetchone()[0]
             db.execute("UPDATE accounts SET owner_user_id=? WHERE customer_id=? AND owner_user_id IS NULL", (user_id, cid))
 
+        if seed_sample_accounts and db.execute("SELECT COUNT(*) FROM transfers").fetchone()[0] == 0:
+            timestamp = now()
+            db.execute("UPDATE accounts SET balance_cents=balance_cents-1000000 WHERE id=1")
+            db.execute("UPDATE accounts SET balance_cents=balance_cents+1000000 WHERE id=2")
+            db.executemany("""INSERT INTO transfers(request_id,sender_account_id,recipient_account_id,amount_cents,status,
+                created_at,checked_at,failure_reason,description,scheduled_for) VALUES(?,?,?,?,?,?,?,?,?,?)""", [
+                ("TR-DEMO-COMPLETE", 1, 2, 1_000_000, "Completed", timestamp, timestamp, None,
+                 "Monthly allowance", None),
+                ("TR-DEMO-FAILED", 1, 2, 15_000_000, "Failed", timestamp, timestamp, "Insufficient funds",
+                 "Utility bills", None)
+            ])
+
         db.execute("DELETE FROM sessions WHERE expires_at <= ?", (int(datetime.now(timezone.utc).timestamp()),))
 
 
@@ -161,15 +204,45 @@ def create_session(db: sqlite3.Connection, user_id: int) -> tuple[str, str]:
     return sid, csrf
 
 
+def insert_audit(db: sqlite3.Connection, actor_user_id: int | None, action: str,
+                 entity_type: str, entity_id: str, details: str) -> None:
+    db.execute("INSERT INTO audit_logs(actor_user_id,action,entity_type,entity_id,details,created_at) VALUES(?,?,?,?,?,?)",
+               (actor_user_id, action, entity_type, entity_id, details, now()))
+
+
+def parse_scheduled_for(value: str) -> datetime:
+    try:
+        due = datetime.fromisoformat(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Choose a valid scheduled date and time") from exc
+    if due.tzinfo is None:
+        due = due.replace(tzinfo=KZ_TIMEZONE)
+    return due.astimezone(timezone.utc)
+
+
 def schedule_pending() -> None:
     with connect() as db:
         ids = [row[0] for row in db.execute("SELECT request_id FROM transfers WHERE status='Pending'")]
+        scheduled = [(row[0], row[1]) for row in db.execute(
+            "SELECT request_id,scheduled_for FROM scheduled_transfers WHERE status='Scheduled'")]
     for request_id in ids:
         schedule_transfer(request_id)
+    for request_id, scheduled_for in scheduled:
+        schedule_scheduled_transfer(request_id, scheduled_for)
 
 
 def schedule_transfer(request_id: str) -> None:
     timer = threading.Timer(TRANSFER_DELAY_SECONDS, process_transfer, args=(request_id,))
+    timer.daemon = True
+    timer.start()
+
+
+def schedule_scheduled_transfer(request_id: str, scheduled_for: str) -> None:
+    try:
+        delay = max((parse_scheduled_for(scheduled_for) - datetime.now(timezone.utc)).total_seconds(), 0)
+    except ValueError:
+        delay = 0
+    timer = threading.Timer(delay, process_scheduled_transfer, args=(request_id,))
     timer.daemon = True
     timer.start()
 
@@ -182,19 +255,91 @@ def process_transfer(request_id: str) -> None:
             if not transfer or transfer["status"] != "Pending":
                 db.rollback()
                 return
-            sender = db.execute("SELECT balance_cents FROM accounts WHERE id=?", (transfer["sender_account_id"],)).fetchone()
+            sender = db.execute("SELECT balance_cents,owner_user_id FROM accounts WHERE id=?", (transfer["sender_account_id"],)).fetchone()
             if not sender or sender["balance_cents"] < transfer["amount_cents"]:
                 db.execute("UPDATE transfers SET status='Failed',failure_reason='Insufficient funds',checked_at=? WHERE request_id=?",
                            (now(), request_id))
+                insert_audit(db, sender["owner_user_id"] if sender else None, "Transfer failed", "transfer", request_id,
+                             f"{transfer['amount_cents'] / CENT:,.2f} KZT was not sent: insufficient funds.")
             else:
                 db.execute("UPDATE accounts SET balance_cents=balance_cents-? WHERE id=?",
                            (transfer["amount_cents"], transfer["sender_account_id"]))
                 db.execute("UPDATE accounts SET balance_cents=balance_cents+? WHERE id=?",
                            (transfer["amount_cents"], transfer["recipient_account_id"]))
                 db.execute("UPDATE transfers SET status='Completed',checked_at=? WHERE request_id=?", (now(), request_id))
+                insert_audit(db, sender["owner_user_id"], "Transfer completed", "transfer", request_id,
+                             f"{transfer['amount_cents'] / CENT:,.2f} KZT transfer completed.")
             db.commit()
     except sqlite3.Error as exc:
         print(f"Could not process pending transfer {request_id}: {exc}")
+
+
+def process_scheduled_transfer(request_id: str) -> None:
+    try:
+        with DB_LOCK, connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            scheduled = db.execute("SELECT * FROM scheduled_transfers WHERE request_id=?", (request_id,)).fetchone()
+            if not scheduled or scheduled["status"] != "Scheduled":
+                db.rollback()
+                return
+            due = parse_scheduled_for(scheduled["scheduled_for"])
+            if due > datetime.now(timezone.utc):
+                db.rollback()
+                schedule_scheduled_transfer(request_id, scheduled["scheduled_for"])
+                return
+
+            sender = db.execute("SELECT balance_cents,owner_user_id FROM accounts WHERE id=?",
+                                (scheduled["sender_account_id"],)).fetchone()
+            recipient = db.execute("SELECT id FROM accounts WHERE id=?", (scheduled["recipient_account_id"],)).fetchone()
+            reason = None
+            if not sender or sender["owner_user_id"] != scheduled["user_id"] or not recipient:
+                reason = "Account is no longer available"
+            elif scheduled["amount_cents"] < MIN_TRANSFER_CENTS:
+                reason = "Amount is below the minimum transfer limit"
+            elif scheduled["amount_cents"] > MAX_TRANSFER_CENTS:
+                reason = "Amount exceeds the maximum per-transfer limit"
+            else:
+                start_utc, end_utc = local_day_bounds_utc()
+                used = db.execute("""SELECT COALESCE(SUM(amount_cents),0) FROM transfers
+                    WHERE sender_account_id IN (SELECT id FROM accounts WHERE owner_user_id=?)
+                    AND status IN ('Pending','Completed') AND datetime(created_at)>=datetime(?) AND datetime(created_at)<datetime(?)""",
+                                  (scheduled["user_id"], start_utc, end_utc)).fetchone()[0]
+                if used + scheduled["amount_cents"] > DAILY_LIMIT_CENTS:
+                    reason = "Daily transfer limit would be exceeded"
+                elif sender["balance_cents"] < scheduled["amount_cents"]:
+                    reason = "Insufficient funds at scheduled time"
+
+            timestamp = now()
+            if reason:
+                db.execute("UPDATE scheduled_transfers SET status='Failed',failure_reason=?,updated_at=? WHERE request_id=?",
+                           (reason, timestamp, request_id))
+                insert_audit(db, scheduled["user_id"], "Scheduled transfer failed", "scheduled_transfer", request_id,
+                             f"{scheduled['amount_cents'] / CENT:,.2f} KZT was not sent: {reason}.")
+            else:
+                try:
+                    db.execute("""INSERT INTO transfers(request_id,sender_account_id,recipient_account_id,amount_cents,status,
+                        created_at,checked_at,failure_reason,description,scheduled_for) VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                               (request_id, scheduled["sender_account_id"], scheduled["recipient_account_id"],
+                                scheduled["amount_cents"], "Completed", timestamp, timestamp, None,
+                                scheduled["reminder_note"], scheduled["scheduled_for"]))
+                except sqlite3.IntegrityError:
+                    reason = "Transfer reference is already in use"
+                    db.execute("UPDATE scheduled_transfers SET status='Failed',failure_reason=?,updated_at=? WHERE request_id=?",
+                               (reason, timestamp, request_id))
+                    insert_audit(db, scheduled["user_id"], "Scheduled transfer failed", "scheduled_transfer", request_id,
+                                 f"The transfer could not be created: {reason}.")
+                else:
+                    db.execute("UPDATE accounts SET balance_cents=balance_cents-? WHERE id=?",
+                               (scheduled["amount_cents"], scheduled["sender_account_id"]))
+                    db.execute("UPDATE accounts SET balance_cents=balance_cents+? WHERE id=?",
+                               (scheduled["amount_cents"], scheduled["recipient_account_id"]))
+                    db.execute("UPDATE scheduled_transfers SET status='Completed',updated_at=? WHERE request_id=?",
+                               (timestamp, request_id))
+                    insert_audit(db, scheduled["user_id"], "Scheduled transfer completed", "transfer", request_id,
+                                 f"{scheduled['amount_cents'] / CENT:,.2f} KZT scheduled transfer completed.")
+            db.commit()
+    except (sqlite3.Error, ValueError) as exc:
+        print(f"Could not process scheduled transfer {request_id}: {exc}")
 
 
 def cents_from(value) -> int:
@@ -211,7 +356,7 @@ def cents_from(value) -> int:
 
 
 def local_day_bounds_utc() -> tuple[str, str]:
-    local = datetime.now(timezone(timedelta(hours=5)))
+    local = datetime.now(KZ_TIMEZONE)
     start_local = local.replace(hour=0, minute=0, second=0, microsecond=0)
     end_local = start_local + timedelta(days=1)
     return (start_local.astimezone(timezone.utc).isoformat(timespec="seconds"),
@@ -324,6 +469,17 @@ class Handler(BaseHTTPRequestHandler):
                                  "daily": DAILY_LIMIT_CENTS / CENT, "usedToday": used / CENT,
                                  "remainingToday": max(DAILY_LIMIT_CENTS - used, 0) / CENT})
             return
+        if path == "/api/audit-logs":
+            if user["email"].strip().lower() != "aruzhan@example.test":
+                self.send_json(403, {"error": "Audit log access is limited to aruzhan@example.test"})
+                return
+            with connect() as db:
+                rows = db.execute("""SELECT action,entity_type,entity_id,details,created_at FROM audit_logs
+                    WHERE actor_user_id=? ORDER BY id DESC LIMIT 50""", (user["user_id"],)).fetchall()
+                self.send_json(200, [{"action": r["action"], "entityType": r["entity_type"],
+                                     "reference": r["entity_id"], "details": r["details"],
+                                     "createdAt": r["created_at"]} for r in rows])
+            return
         if path == "/api/transfers":
             ids = self.user_account_ids(user["user_id"])
             if not ids:
@@ -339,20 +495,41 @@ class Handler(BaseHTTPRequestHandler):
                     LEFT JOIN users su ON su.id=sa.owner_user_id LEFT JOIN users ru ON ru.id=ra.owner_user_id
                     WHERE t.sender_account_id IN ({placeholders}) OR t.recipient_account_id IN ({placeholders})
                     ORDER BY t.created_at DESC LIMIT 50""", (*ids, *ids)).fetchall()
-                self.send_json(200, [self.transfer_payload(r, ids) for r in rows])
+                entries = [self.transfer_payload(r, ids) for r in rows]
+                scheduled = db.execute("""SELECT s.*,su.full_name sender_name,ru.full_name recipient_name,
+                    sc.account_number sender_number,rc.account_number recipient_number
+                    FROM scheduled_transfers s JOIN accounts sa ON sa.id=s.sender_account_id
+                    JOIN accounts ra ON ra.id=s.recipient_account_id
+                    JOIN customers sc ON sc.id=sa.customer_id JOIN customers rc ON rc.id=ra.customer_id
+                    LEFT JOIN users su ON su.id=sa.owner_user_id LEFT JOIN users ru ON ru.id=ra.owner_user_id
+                    WHERE s.user_id=? AND s.status IN ('Scheduled','Cancelled','Failed')
+                    ORDER BY s.created_at DESC LIMIT 50""", (user["user_id"],)).fetchall()
+                entries.extend(self.scheduled_payload(r) for r in scheduled)
+                entries.sort(key=lambda row: row["createdAt"], reverse=True)
+                self.send_json(200, entries[:50])
             return
         match = re.fullmatch(r"/api/transfers/([^/]+)", path)
         if match:
             ids = self.user_account_ids(user["user_id"])
             with connect() as db:
                 row = self.transfer_row(db, match.group(1))
-                if not row or (row["sender_account_id"] not in ids and row["recipient_account_id"] not in ids):
-                    self.send_json(404, {"error": "Transfer not found"})
-                    return
-                checked = now()
-                db.execute("UPDATE transfers SET checked_at=? WHERE request_id=?", (checked, row["request_id"]))
-                row = self.transfer_row(db, row["request_id"])
-                self.send_json(200, self.transfer_payload(row, ids))
+                if row and (row["sender_account_id"] in ids or row["recipient_account_id"] in ids):
+                    checked = now()
+                    db.execute("UPDATE transfers SET checked_at=? WHERE request_id=?", (checked, row["request_id"]))
+                    row = self.transfer_row(db, row["request_id"])
+                    result = self.transfer_payload(row, ids)
+                else:
+                    scheduled = self.scheduled_row(db, match.group(1))
+                    if not scheduled or scheduled["user_id"] != user["user_id"]:
+                        self.send_json(404, {"error": "Transfer not found"})
+                        return
+                    db.execute("UPDATE scheduled_transfers SET updated_at=? WHERE request_id=? AND status='Scheduled'",
+                               (now(), scheduled["request_id"]))
+                    scheduled = self.scheduled_row(db, match.group(1))
+                    result = self.scheduled_payload(scheduled)
+                insert_audit(db, user["user_id"], "Transfer details viewed", "transfer", result["requestId"],
+                             f"Viewed transfer details; latest status is {result['status']}.")
+                self.send_json(200, result)
             return
         self.send_json(404, {"error": "Not found"})
 
@@ -372,6 +549,16 @@ class Handler(BaseHTTPRequestHandler):
             WHERE t.request_id=?""", (request_id,)).fetchone()
 
     @staticmethod
+    def scheduled_row(db: sqlite3.Connection, request_id: str):
+        return db.execute("""SELECT s.*,su.full_name sender_name,ru.full_name recipient_name,
+            sc.account_number sender_number,rc.account_number recipient_number
+            FROM scheduled_transfers s JOIN accounts sa ON sa.id=s.sender_account_id
+            JOIN accounts ra ON ra.id=s.recipient_account_id
+            JOIN customers sc ON sc.id=sa.customer_id JOIN customers rc ON rc.id=ra.customer_id
+            LEFT JOIN users su ON su.id=sa.owner_user_id LEFT JOIN users ru ON ru.id=ra.owner_user_id
+            WHERE s.request_id=?""", (request_id,)).fetchone()
+
+    @staticmethod
     def transfer_payload(row: sqlite3.Row, account_ids: list[int]) -> dict:
         outgoing = row["sender_account_id"] in account_ids
         return {"requestId": row["request_id"], "fromAccountId": row["sender_account_id"],
@@ -380,7 +567,18 @@ class Handler(BaseHTTPRequestHandler):
                 "recipientNumber": row["recipient_number"], "amount": row["amount_cents"] / CENT,
                 "direction": "outgoing" if outgoing else "incoming", "status": row["status"],
                 "description": row["description"], "createdAt": row["created_at"],
-                "checkedAt": row["checked_at"], "failureReason": row["failure_reason"]}
+                "checkedAt": row["checked_at"], "failureReason": row["failure_reason"],
+                "scheduledFor": row["scheduled_for"]}
+
+    @staticmethod
+    def scheduled_payload(row: sqlite3.Row) -> dict:
+        return {"requestId": row["request_id"], "fromAccountId": row["sender_account_id"],
+                "toAccountId": row["recipient_account_id"], "from": row["sender_name"],
+                "to": row["recipient_name"], "counterparty": row["recipient_name"],
+                "recipientNumber": row["recipient_number"], "amount": row["amount_cents"] / CENT,
+                "direction": "outgoing", "status": row["status"], "description": row["reminder_note"],
+                "createdAt": row["created_at"], "checkedAt": row["updated_at"],
+                "failureReason": row["failure_reason"], "scheduledFor": row["scheduled_for"]}
 
     def do_POST(self) -> None:
         path = urlparse(self.path).path
@@ -392,6 +590,8 @@ class Handler(BaseHTTPRequestHandler):
             if not user:
                 return
             with connect() as db:
+                insert_audit(db, user["user_id"], "User signed out", "user", str(user["user_id"]),
+                             f"{user['full_name']} signed out.")
                 db.execute("DELETE FROM sessions WHERE session_id=?", (user["session_id"],))
             self.send_json(200, {"ok": True}, [("Set-Cookie", "bank_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0")])
             return
@@ -399,7 +599,34 @@ class Handler(BaseHTTPRequestHandler):
         if not user:
             return
         if path == "/api/next-id":
-            self.send_json(200, {"requestId": "TR-" + secrets.token_hex(5).upper()})
+            self.send_json(200, {"requestId": "TR-" + secrets.token_hex(16).upper()})
+            return
+        cancel_match = re.fullmatch(r"/api/scheduled/([^/]+)/cancel", path)
+        if cancel_match:
+            request_id = cancel_match.group(1)
+            with DB_LOCK, connect() as db:
+                db.execute("BEGIN IMMEDIATE")
+                scheduled = db.execute("SELECT * FROM scheduled_transfers WHERE request_id=? AND user_id=?",
+                                       (request_id, user["user_id"])).fetchone()
+                if not scheduled:
+                    db.rollback()
+                    self.send_json(404, {"error": "Scheduled transfer not found"})
+                    return
+                if scheduled["status"] != "Scheduled":
+                    db.rollback()
+                    self.send_json(409, {"error": f"This transfer is already {scheduled['status'].lower()} and cannot be cancelled"})
+                    return
+                timestamp = now()
+                db.execute("UPDATE scheduled_transfers SET status='Cancelled',updated_at=? WHERE request_id=?",
+                           (timestamp, request_id))
+                insert_audit(db, user["user_id"], "Scheduled transfer cancelled", "scheduled_transfer", request_id,
+                             f"Cancelled scheduled payment for {scheduled['amount_cents'] / CENT:,.2f} KZT.")
+                result = self.scheduled_row(db, request_id)
+                db.commit()
+            self.send_json(200, self.scheduled_payload(result))
+            return
+        if path == "/api/scheduled":
+            self.create_scheduled(user)
             return
         if path != "/api/transfers":
             self.send_json(404, {"error": "Not found"})
@@ -428,6 +655,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(400, {"error": "Choose one of your accounts and a different recipient"})
                 return
 
+            if db.execute("SELECT 1 FROM scheduled_transfers WHERE request_id=?", (request_id,)).fetchone():
+                db.rollback()
+                self.send_json(409, {"error": "This reference is already attached to a scheduled transfer"})
+                return
+
             existing = db.execute("SELECT * FROM transfers WHERE request_id=?", (request_id,)).fetchone()
             if existing:
                 matches = (existing["sender_account_id"] == sender_id and existing["recipient_account_id"] == recipient_id
@@ -436,17 +668,23 @@ class Handler(BaseHTTPRequestHandler):
                     db.rollback()
                     self.send_json(409, {"error": "This reference is already attached to different transfer details"})
                     return
+                insert_audit(db, user["user_id"], "Transfer retry received", "transfer", request_id,
+                             f"Repeated request returned existing {existing['status'].lower()} transfer; no second debit was made.")
                 row = self.transfer_row(db, request_id)
                 db.commit()
                 self.send_json(200, self.transfer_payload(row, [sender_id]))
                 return
 
             if cents < MIN_TRANSFER_CENTS:
-                db.rollback()
+                insert_audit(db, user["user_id"], "Transfer rejected", "transfer", request_id,
+                             f"Rejected {cents / CENT:,.2f} KZT amount below the minimum limit.")
+                db.commit()
                 self.send_json(400, {"error": f"Minimum transfer is {MIN_TRANSFER_CENTS / CENT:,.2f} KZT"})
                 return
             if cents > MAX_TRANSFER_CENTS:
-                db.rollback()
+                insert_audit(db, user["user_id"], "Transfer rejected", "transfer", request_id,
+                             f"Rejected {cents / CENT:,.2f} KZT amount above the maximum limit.")
+                db.commit()
                 self.send_json(400, {"error": f"Maximum per transfer is {MAX_TRANSFER_CENTS / CENT:,.2f} KZT"})
                 return
 
@@ -457,7 +695,9 @@ class Handler(BaseHTTPRequestHandler):
                                (user["user_id"], start_utc, end_utc)).fetchone()[0]
             if total + cents > DAILY_LIMIT_CENTS:
                 remaining = max(DAILY_LIMIT_CENTS - total, 0) / CENT
-                db.rollback()
+                insert_audit(db, user["user_id"], "Transfer rejected", "transfer", request_id,
+                             f"Rejected because the daily limit would be exceeded; {remaining:,.2f} KZT remained.")
+                db.commit()
                 self.send_json(400, {"error": f"Daily transfer limit is {DAILY_LIMIT_CENTS / CENT:,.2f} KZT. Remaining today: {remaining:,.2f} KZT"})
                 return
 
@@ -466,9 +706,69 @@ class Handler(BaseHTTPRequestHandler):
                 created_at,checked_at,failure_reason,description) VALUES(?,?,?,?,?,?,?,?,?)""",
                        (request_id, sender_id, recipient_id, cents, "Pending", created, created, None, description))
             row = self.transfer_row(db, request_id)
+            insert_audit(db, user["user_id"], "Transfer submitted", "transfer", request_id,
+                         f"Submitted {cents / CENT:,.2f} KZT to {row['recipient_name']}; current status is Pending.")
             db.commit()
         schedule_transfer(request_id)
         self.send_json(202, self.transfer_payload(row, [sender_id]))
+
+    def create_scheduled(self, user: sqlite3.Row) -> None:
+        try:
+            payload = self.read_json()
+            request_id = str(payload.get("requestId", "")).strip()
+            if not re.fullmatch(r"TR-[A-F0-9]{32}", request_id):
+                raise ValueError("Transfer reference is invalid. Please start a new transfer")
+            sender_id = int(payload.get("fromAccountId", 0))
+            recipient_id = int(payload.get("toAccountId", 0))
+            cents = cents_from(payload.get("amount", 0))
+            reminder = str(payload.get("reminderNote", "")).strip()
+            due = parse_scheduled_for(str(payload.get("scheduledFor", "")))
+            current = datetime.now(timezone.utc)
+            if due < current + timedelta(seconds=SCHEDULE_MIN_SECONDS):
+                raise ValueError("Choose a time at least 30 seconds in the future")
+            if due > current + timedelta(days=SCHEDULE_MAX_DAYS):
+                raise ValueError("Transfers can be scheduled up to 365 days ahead")
+            if len(reminder) > 200:
+                raise ValueError("Reminder note must be 200 characters or fewer")
+        except (ValueError, TypeError) as exc:
+            self.send_json(400, {"error": str(exc) or "Invalid scheduled transfer"})
+            return
+
+        if cents < MIN_TRANSFER_CENTS:
+            self.send_json(400, {"error": f"Minimum transfer is {MIN_TRANSFER_CENTS / CENT:,.2f} KZT"})
+            return
+        if cents > MAX_TRANSFER_CENTS:
+            self.send_json(400, {"error": f"Maximum per transfer is {MAX_TRANSFER_CENTS / CENT:,.2f} KZT"})
+            return
+
+        with DB_LOCK, connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            sender = db.execute("SELECT id FROM accounts WHERE id=? AND owner_user_id=?",
+                                (sender_id, user["user_id"])).fetchone()
+            recipient = db.execute("SELECT id FROM accounts WHERE id=?", (recipient_id,)).fetchone()
+            used = db.execute("SELECT 1 FROM transfers WHERE request_id=? UNION SELECT 1 FROM scheduled_transfers WHERE request_id=?",
+                              (request_id, request_id)).fetchone()
+            if not sender or not recipient or sender_id == recipient_id:
+                db.rollback()
+                self.send_json(400, {"error": "Choose one of your accounts and a different recipient"})
+                return
+            if used:
+                db.rollback()
+                self.send_json(409, {"error": "This transfer reference is already in use"})
+                return
+            due_text = due.isoformat(timespec="seconds")
+            timestamp = now()
+            db.execute("""INSERT INTO scheduled_transfers(request_id,user_id,sender_account_id,recipient_account_id,
+                amount_cents,scheduled_for,reminder_note,status,failure_reason,created_at,updated_at)
+                VALUES(?,?,?,?,?,?,?,'Scheduled',NULL,?,?)""",
+                       (request_id, user["user_id"], sender_id, recipient_id, cents, due_text, reminder, timestamp, timestamp))
+            result = self.scheduled_row(db, request_id)
+            local_due = due.astimezone(KZ_TIMEZONE).strftime("%Y-%m-%d %H:%M UTC+5")
+            insert_audit(db, user["user_id"], "Scheduled transfer created", "scheduled_transfer", request_id,
+                         f"Scheduled {cents / CENT:,.2f} KZT for {local_due}. Reminder: {reminder or 'No reminder note'}.")
+            db.commit()
+        schedule_scheduled_transfer(request_id, due_text)
+        self.send_json(201, self.scheduled_payload(result))
 
     def auth_post(self, path: str) -> None:
         try:
@@ -516,6 +816,8 @@ class Handler(BaseHTTPRequestHandler):
             db.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
             sid, csrf = create_session(db, user_id)
             user = db.execute("SELECT full_name,email FROM users WHERE id=?", (user_id,)).fetchone()
+            action = "Account registered" if path == "/api/register" else "User signed in"
+            insert_audit(db, user_id, action, "user", str(user_id), f"{user['full_name']} {action.lower()}.")
             db.commit()
         cookie = f"bank_session={sid}; HttpOnly; SameSite=Strict; Path=/; Max-Age={SESSION_SECONDS}"
         self.send_json(200, {"authenticated": True, "csrfToken": csrf,

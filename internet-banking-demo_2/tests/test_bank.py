@@ -59,6 +59,11 @@ class BankSystemChecks(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         server.DB_PATH = Path(self._tmp.name) / "test.sqlite3"
         server.init_db()
+        with server.connect() as db:
+            db.execute("DELETE FROM transfers")
+            db.execute("UPDATE accounts SET balance_cents = 10000000 WHERE id = 1")
+            db.execute("UPDATE accounts SET balance_cents = 2500000 WHERE id = 2")
+            db.execute("UPDATE accounts SET balance_cents = 7500000 WHERE id = 3")
 
     def tearDown(self):
         self._tmp.cleanup()

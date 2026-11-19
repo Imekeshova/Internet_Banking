@@ -582,6 +582,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = urlparse(self.path).path
+        if path == "/api/password/change":
+            self.change_password()
+            return
         if path in ("/api/register", "/api/login"):
             self.auth_post(path)
             return
@@ -769,6 +772,41 @@ class Handler(BaseHTTPRequestHandler):
             db.commit()
         schedule_scheduled_transfer(request_id, due_text)
         self.send_json(201, self.scheduled_payload(result))
+
+    def change_password(self) -> None:
+        try:
+            payload = self.read_json()
+            email = str(payload.get("email", "")).strip().lower()
+            old_password = str(payload.get("oldPassword", ""))
+            new_password = str(payload.get("newPassword", ""))
+            confirmation = str(payload.get("passwordConfirmation", ""))
+            if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email) or len(email) > 254:
+                raise ValueError("Enter a valid email address")
+            if not old_password or len(old_password) > 128:
+                raise ValueError("Enter your old password")
+            if len(new_password) < 12 or len(new_password) > 128:
+                raise ValueError("New password must be 12–128 characters")
+            if new_password != confirmation:
+                raise ValueError("New passwords do not match")
+            if new_password == old_password:
+                raise ValueError("Choose a new password different from the old password")
+        except (ValueError, TypeError) as exc:
+            self.send_json(400, {"error": str(exc) or "Invalid password details"})
+            return
+
+        with connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            user = db.execute("SELECT id,full_name,password_hash FROM users WHERE email=? COLLATE NOCASE", (email,)).fetchone()
+            if not user or not verify_password(old_password, user["password_hash"]):
+                db.rollback()
+                self.send_json(401, {"error": "Email or old password is incorrect"})
+                return
+            db.execute("UPDATE users SET password_hash=? WHERE id=?", (password_hash(new_password), user["id"]))
+            db.execute("DELETE FROM sessions WHERE user_id=?", (user["id"],))
+            insert_audit(db, user["id"], "Password changed", "user", str(user["id"]),
+                         f"{user['full_name']} changed the account password. All active sessions were signed out.")
+            db.commit()
+        self.send_json(200, {"ok": True, "message": "Password changed. Please sign in with your new password."})
 
     def auth_post(self, path: str) -> None:
         try:

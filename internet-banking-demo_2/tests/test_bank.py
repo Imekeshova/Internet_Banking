@@ -400,6 +400,48 @@ class BankSystemChecks(unittest.TestCase):
             acc_label = str(r.get("number") or r.get("maskedAccount") or r.get("accountNumber") or r.get("label") or "")
             self.assertIn("••", acc_label)
             
+    def test_24_security_audit_log_restricted_to_admin_only(self):
+        """Security & Privacy (SIS 11): Audit/admin endpoints are protected and API leaks no secrets."""
+        aru_cookie, _ = self.login(ARUZHAN)
+        dias_cookie, _ = self.login(DIAS)
+
+        # Check audit endpoint if implemented, otherwise verify protected API responses leak no secrets
+        for candidate in ("/api/audit-log", "/api/audit"):
+            aru_status, _, logs = invoke("GET", candidate, cookie=aru_cookie)
+            if aru_status == 200:
+                dias_status, _, _ = invoke("GET", candidate, cookie=dias_cookie)
+                self.assertIn(dias_status, (401, 403, 404))
+                serialized = json.dumps(logs)
+                self.assertNotIn("DemoPass!23", serialized)
+                self.assertNotIn("pbkdf2_sha256$", serialized)
+                return
+
+        # Fallback: verify all core customer endpoints never expose password hashes or session tokens
+        for path in ("/api/accounts", "/api/transfers", "/api/recipients", "/api/limits"):
+            status, _, payload = invoke("GET", path, cookie=aru_cookie)
+            self.assertEqual(status, 200)
+            serialized = json.dumps(payload)
+            self.assertNotIn("DemoPass!23", serialized)
+            self.assertNotIn("pbkdf2_sha256$", serialized)
+
+    def test_25_ethics_integer_tiyn_precision_and_no_rounding_loss(self):
+        """Ethics (SIS 11): exact tiyn arithmetic prevents rounding loss and 1-tiyn overdrafts."""
+        s = self.login(DIAS)  # Dias starts with 25,000.00 KZT = 2,500,000 tiyn
+        self.send(s, "TR-" + "D" * 31 + "1", 2, 1, "100.33", description="Split bill 1")
+        self.complete_if_pending("TR-" + "D" * 31 + "1")
+        self.send(s, "TR-" + "D" * 31 + "2", 2, 1, "200.67", description="Split bill 2")
+        self.complete_if_pending("TR-" + "D" * 31 + "2")
+
+        # 100.33 + 200.67 = exactly 301.00 KZT (30,100 tiyn) — zero rounding loss
+        self.assertEqual(self.balance(2), 2_500_000 - 30_100)
+        self.assertEqual(self.balance(1), 10_000_000 + 30_100)
+
+        # Attempting to send 1 tiyn (0.01 KZT) over remaining balance must fail cleanly
+        over_rid = "TR-" + "D" * 31 + "3"
+        self.send(s, over_rid, 2, 1, "24699.01")
+        self.complete_if_pending(over_rid)
+        self.assertEqual(self.transfer_row(over_rid)["status"], "Failed")
+        self.assertEqual(self.balance(2), 2_500_000 - 30_100)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

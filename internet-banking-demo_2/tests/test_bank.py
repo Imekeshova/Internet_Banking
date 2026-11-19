@@ -387,6 +387,19 @@ class BankSystemChecks(unittest.TestCase):
         _, _, data = invoke("GET", f"/api/transfers/{rid}", cookie=s[0])
         self.assertEqual(data["checkedAt"], old)
 
+    def test_23_privacy_recipients_masked_and_no_sensitive_leaks(self):
+        """Privacy (SIS 11): recipient list masks account numbers and hides balances/hashes."""
+        cookie, _ = self.login(ARUZHAN)
+        status, _, recips = invoke("GET", "/api/recipients", cookie=cookie)
+        self.assertEqual(status, 200)
+        self.assertTrue(len(recips) > 0)
+        for r in recips:
+            self.assertNotIn("balance", r)
+            self.assertNotIn("balance_cents", r)
+            self.assertNotIn("password_hash", r)
+            acc_label = str(r.get("number") or r.get("maskedAccount") or r.get("accountNumber") or r.get("label") or "")
+            self.assertIn("••", acc_label)
+            
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

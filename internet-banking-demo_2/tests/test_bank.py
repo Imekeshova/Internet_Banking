@@ -59,6 +59,11 @@ class BankSystemChecks(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         server.DB_PATH = Path(self._tmp.name) / "test.sqlite3"
         server.init_db()
+        with server.connect() as db:
+            db.execute("DELETE FROM transfers")
+            db.execute("UPDATE accounts SET balance_cents = 10000000 WHERE id = 1")
+            db.execute("UPDATE accounts SET balance_cents = 2500000 WHERE id = 2")
+            db.execute("UPDATE accounts SET balance_cents = 7500000 WHERE id = 3")
 
     def tearDown(self):
         self._tmp.cleanup()
@@ -382,6 +387,19 @@ class BankSystemChecks(unittest.TestCase):
         _, _, data = invoke("GET", f"/api/transfers/{rid}", cookie=s[0])
         self.assertEqual(data["checkedAt"], old)
 
+    def test_23_privacy_recipients_masked_and_no_sensitive_leaks(self):
+        """Privacy (SIS 11): recipient list masks account numbers and hides balances/hashes."""
+        cookie, _ = self.login(ARUZHAN)
+        status, _, recips = invoke("GET", "/api/recipients", cookie=cookie)
+        self.assertEqual(status, 200)
+        self.assertTrue(len(recips) > 0)
+        for r in recips:
+            self.assertNotIn("balance", r)
+            self.assertNotIn("balance_cents", r)
+            self.assertNotIn("password_hash", r)
+            acc_label = str(r.get("number") or r.get("maskedAccount") or r.get("accountNumber") or r.get("label") or "")
+            self.assertIn("••", acc_label)
+            
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

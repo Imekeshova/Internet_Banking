@@ -104,6 +104,7 @@ def init_db() -> None:
             status TEXT NOT NULL CHECK(status IN ('Pending','Completed','Failed')),
             created_at TEXT NOT NULL,
             checked_at TEXT NOT NULL,
+            completed_at TEXT,
             failure_reason TEXT,
             description TEXT NOT NULL DEFAULT '',
             scheduled_for TEXT
@@ -153,6 +154,29 @@ def init_db() -> None:
             db.execute("ALTER TABLE transfers ADD COLUMN description TEXT NOT NULL DEFAULT ''")
         if "scheduled_for" not in transfer_columns:
             db.execute("ALTER TABLE transfers ADD COLUMN scheduled_for TEXT")
+        if "completed_at" not in transfer_columns:
+            db.execute("ALTER TABLE transfers ADD COLUMN completed_at TEXT")
+
+        # Old checked_at values were overwritten when receipts were viewed. Recover
+        # completion from a success audit or a matching completed schedule instead.
+        # Without either record, creation time is the documented historical fallback.
+        # Only fill missing values: restarting must never move a completed transfer.
+        db.execute("""UPDATE transfers SET completed_at=COALESCE(
+            (SELECT a.created_at FROM audit_logs a
+             WHERE a.entity_type='transfer' AND a.entity_id=transfers.request_id
+               AND a.action IN ('Transfer completed','Scheduled transfer completed')
+               AND julianday(a.created_at)>=julianday(transfers.created_at)
+             ORDER BY julianday(a.created_at),a.id LIMIT 1),
+            (SELECT s.updated_at FROM scheduled_transfers s
+             WHERE s.request_id=transfers.request_id AND s.status='Completed'
+               AND s.sender_account_id=transfers.sender_account_id
+               AND s.recipient_account_id=transfers.recipient_account_id
+               AND s.amount_cents=transfers.amount_cents
+               AND s.scheduled_for=transfers.scheduled_for
+               AND julianday(s.updated_at)>=julianday(transfers.created_at)),
+            created_at)
+            WHERE status='Completed' AND completed_at IS NULL""")
+        db.execute("CREATE INDEX IF NOT EXISTS transfers_sender_completed ON transfers(sender_account_id,completed_at)")
 
         seed_sample_accounts = db.execute("SELECT COUNT(*) FROM customers").fetchone()[0] == 0
         if seed_sample_accounts:
@@ -187,10 +211,10 @@ def init_db() -> None:
             db.execute("UPDATE accounts SET balance_cents=balance_cents-1000000 WHERE id=1")
             db.execute("UPDATE accounts SET balance_cents=balance_cents+1000000 WHERE id=2")
             db.executemany("""INSERT INTO transfers(request_id,sender_account_id,recipient_account_id,amount_cents,status,
-                created_at,checked_at,failure_reason,description,scheduled_for) VALUES(?,?,?,?,?,?,?,?,?,?)""", [
-                ("TR-DEMO-COMPLETE", 1, 2, 1_000_000, "Completed", timestamp, timestamp, None,
+                created_at,checked_at,completed_at,failure_reason,description,scheduled_for) VALUES(?,?,?,?,?,?,?,?,?,?,?)""", [
+                ("TR-DEMO-COMPLETE", 1, 2, 1_000_000, "Completed", timestamp, timestamp, timestamp, None,
                  "Monthly allowance", None),
-                ("TR-DEMO-FAILED", 1, 2, 15_000_000, "Failed", timestamp, timestamp, "Insufficient funds",
+                ("TR-DEMO-FAILED", 1, 2, 15_000_000, "Failed", timestamp, timestamp, None, "Insufficient funds",
                  "Utility bills", None)
             ])
 
@@ -266,7 +290,9 @@ def process_transfer(request_id: str) -> None:
                            (transfer["amount_cents"], transfer["sender_account_id"]))
                 db.execute("UPDATE accounts SET balance_cents=balance_cents+? WHERE id=?",
                            (transfer["amount_cents"], transfer["recipient_account_id"]))
-                db.execute("UPDATE transfers SET status='Completed',checked_at=? WHERE request_id=?", (now(), request_id))
+                completed = now()
+                db.execute("UPDATE transfers SET status='Completed',checked_at=?,completed_at=? WHERE request_id=?",
+                           (completed, completed, request_id))
                 insert_audit(db, sender["owner_user_id"], "Transfer completed", "transfer", request_id,
                              f"{transfer['amount_cents'] / CENT:,.2f} KZT transfer completed.")
             db.commit()
@@ -318,9 +344,9 @@ def process_scheduled_transfer(request_id: str) -> None:
             else:
                 try:
                     db.execute("""INSERT INTO transfers(request_id,sender_account_id,recipient_account_id,amount_cents,status,
-                        created_at,checked_at,failure_reason,description,scheduled_for) VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                        created_at,checked_at,completed_at,failure_reason,description,scheduled_for) VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
                                (request_id, scheduled["sender_account_id"], scheduled["recipient_account_id"],
-                                scheduled["amount_cents"], "Completed", timestamp, timestamp, None,
+                                scheduled["amount_cents"], "Completed", timestamp, timestamp, timestamp, None,
                                 scheduled["reminder_note"], scheduled["scheduled_for"]))
                 except sqlite3.IntegrityError:
                     reason = "Transfer reference is already in use"
@@ -361,6 +387,73 @@ def local_day_bounds_utc() -> tuple[str, str]:
     end_local = start_local + timedelta(days=1)
     return (start_local.astimezone(timezone.utc).isoformat(timespec="seconds"),
             end_local.astimezone(timezone.utc).isoformat(timespec="seconds"))
+
+
+def analytics_periods(as_of: datetime) -> tuple[dict, dict]:
+    """Current calendar week (Monday first) and month in Kazakhstan's UTC+5."""
+    local = as_of.astimezone(KZ_TIMEZONE)
+    midnight = local.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start = midnight - timedelta(days=midnight.weekday())
+    month_start = midnight.replace(day=1)
+    month_end = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
+
+    def period(start: datetime, end: datetime) -> dict:
+        return {"start": start.astimezone(timezone.utc).isoformat(timespec="seconds"),
+                "end": end.astimezone(timezone.utc).isoformat(timespec="seconds"),
+                "totalAmount": 0, "count": 0}
+
+    return period(week_start, week_start + timedelta(days=7)), period(month_start, month_end)
+
+
+def transfer_analytics(user_id: int) -> dict:
+    as_of = now()
+    week, month = analytics_periods(datetime.fromisoformat(as_of))
+    # Read the full relevant ledger, independently of the 50-row activity feed.
+    # Integer tiyn are summed before conversion to the API's KZT amounts.
+    with connect() as db:
+        rows = db.execute("""SELECT t.request_id,t.amount_cents,t.completed_at,
+                ra.owner_user_id recipient_user_id,ra.customer_id recipient_customer_id,
+                COALESCE(ru.full_name,rc.name) recipient_name,rc.account_number recipient_number,
+                julianday(t.completed_at)>=julianday(?) in_week,
+                julianday(t.completed_at)>=julianday(?) in_month
+            FROM transfers t JOIN accounts sa ON sa.id=t.sender_account_id
+            JOIN accounts ra ON ra.id=t.recipient_account_id
+            JOIN customers rc ON rc.id=ra.customer_id
+            LEFT JOIN users ru ON ru.id=ra.owner_user_id
+            WHERE sa.owner_user_id=? AND t.status='Completed'
+              AND julianday(t.completed_at)>=julianday(?)
+              AND julianday(t.completed_at)<=julianday(?)
+            ORDER BY julianday(t.completed_at),t.request_id""",
+                          (week["start"], month["start"], user_id,
+                           min(week["start"], month["start"]), as_of)).fetchall()
+    weekly = [row for row in rows if row["in_week"]]
+    monthly = [row for row in rows if row["in_month"]]
+    for period, entries in ((week, weekly), (month, monthly)):
+        period["totalAmount"] = sum(row["amount_cents"] for row in entries) / CENT
+        period["count"] = len(entries)
+
+    def transfer_summary(row: sqlite3.Row) -> dict:
+        return {"requestId": row["request_id"], "amount": row["amount_cents"] / CENT,
+                "recipient": row["recipient_name"], "recipientNumber": row["recipient_number"],
+                "completedAt": row["completed_at"]}
+
+    month["largest"] = transfer_summary(max(monthly, key=lambda row: row["amount_cents"])) if monthly else None
+    month["smallest"] = transfer_summary(min(monthly, key=lambda row: row["amount_cents"])) if monthly else None
+    recipients = {}
+    for row in monthly:
+        # Legacy accounts without an owner still represent distinct customers.
+        # Negative customer IDs cannot collide with positive registered user IDs.
+        recipient_id = row["recipient_user_id"] or -row["recipient_customer_id"]
+        recipient = recipients.setdefault(recipient_id, {
+            "recipientId": recipient_id, "name": row["recipient_name"], "count": 0, "totalCents": 0})
+        recipient["count"] += 1
+        recipient["totalCents"] += row["amount_cents"]
+    highest_count = max((recipient["count"] for recipient in recipients.values()), default=0)
+    leaders = [{"recipientId": recipient["recipientId"], "name": recipient["name"],
+                "count": recipient["count"], "totalAmount": recipient["totalCents"] / CENT}
+               for recipient in recipients.values() if recipient["count"] == highest_count]
+    month["frequentRecipients"] = sorted(leaders, key=lambda recipient: (recipient["name"].casefold(), recipient["recipientId"]))
+    return {"currency": "KZT", "timeZone": "UTC+5", "asOf": as_of, "week": week, "month": month}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -420,10 +513,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         path = urlparse(self.path).path
-        if path == "/":
-            body = (ROOT / "index.html").read_bytes()
+        public_files = {
+            "/": ("index.html", "text/html; charset=utf-8"),
+            "/analytics.js": ("analytics.js", "text/javascript; charset=utf-8"),
+            "/analytics.css": ("analytics.css", "text/css; charset=utf-8"),
+        }
+        if path in public_files:
+            filename, content_type = public_files[path]
+            body = (ROOT / filename).read_bytes()
             self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("Referrer-Policy", "same-origin")
@@ -440,6 +539,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         user = self.require_user()
         if not user:
+            return
+        if path == "/api/analytics":
+            self.send_json(200, transfer_analytics(user["user_id"]))
             return
         if path == "/api/accounts":
             with connect() as db:
@@ -514,8 +616,8 @@ class Handler(BaseHTTPRequestHandler):
             with connect() as db:
                 row = self.transfer_row(db, match.group(1))
                 if row and (row["sender_account_id"] in ids or row["recipient_account_id"] in ids):
-                    checked = now()
-                    db.execute("UPDATE transfers SET checked_at=? WHERE request_id=?", (checked, row["request_id"]))
+                    db.execute("UPDATE transfers SET checked_at=? WHERE request_id=? AND status='Pending'",
+                               (now(), row["request_id"]))
                     row = self.transfer_row(db, row["request_id"])
                     result = self.transfer_payload(row, ids)
                 else:
@@ -567,7 +669,7 @@ class Handler(BaseHTTPRequestHandler):
                 "recipientNumber": row["recipient_number"], "amount": row["amount_cents"] / CENT,
                 "direction": "outgoing" if outgoing else "incoming", "status": row["status"],
                 "description": row["description"], "createdAt": row["created_at"],
-                "checkedAt": row["checked_at"], "failureReason": row["failure_reason"],
+                "checkedAt": row["checked_at"], "completedAt": row["completed_at"], "failureReason": row["failure_reason"],
                 "scheduledFor": row["scheduled_for"]}
 
     @staticmethod
@@ -578,6 +680,7 @@ class Handler(BaseHTTPRequestHandler):
                 "recipientNumber": row["recipient_number"], "amount": row["amount_cents"] / CENT,
                 "direction": "outgoing", "status": row["status"], "description": row["reminder_note"],
                 "createdAt": row["created_at"], "checkedAt": row["updated_at"],
+                "completedAt": row["updated_at"] if row["status"] == "Completed" else None,
                 "failureReason": row["failure_reason"], "scheduledFor": row["scheduled_for"]}
 
     def do_POST(self) -> None:

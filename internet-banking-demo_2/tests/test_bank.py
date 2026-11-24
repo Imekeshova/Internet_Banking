@@ -377,9 +377,8 @@ class BankSystemChecks(unittest.TestCase):
         _, _, data = invoke("POST", "/api/next-id", {}, cookie=cookie, csrf=csrf)
         self.assertRegex(data["requestId"], r"^TR-[A-F0-9]{32}$")
 
-    @unittest.expectedFailure
-    def test_22_BUG_lookup_must_not_overwrite_checked_at_of_finished_transfer(self):
-        """GET on a Completed/Failed transfer rewrites checked_at (time of the decision is lost)."""
+    def test_22_lookup_preserves_checked_at_of_finished_transfer(self):
+        """Viewing a completed transfer preserves its recorded decision time."""
         s = self.login(ARUZHAN)
         rid = "TR-" + "6" * 32
         old = "2026-11-05T12:05:37+00:00"
@@ -400,23 +399,20 @@ class BankSystemChecks(unittest.TestCase):
             acc_label = str(r.get("number") or r.get("maskedAccount") or r.get("accountNumber") or r.get("label") or "")
             self.assertIn("••", acc_label)
             
-    def test_24_security_audit_log_restricted_to_admin_only(self):
-        """Security & Privacy (SIS 11): Audit/admin endpoints are protected and API leaks no secrets."""
+    def test_24_security_audit_log_restricted_to_authorized_demo_user(self):
+        """The actual audit endpoint allows Aruzhan and rejects other customers."""
         aru_cookie, _ = self.login(ARUZHAN)
         dias_cookie, _ = self.login(DIAS)
 
-        # Check audit endpoint if implemented, otherwise verify protected API responses leak no secrets
-        for candidate in ("/api/audit-log", "/api/audit"):
-            aru_status, _, logs = invoke("GET", candidate, cookie=aru_cookie)
-            if aru_status == 200:
-                dias_status, _, _ = invoke("GET", candidate, cookie=dias_cookie)
-                self.assertIn(dias_status, (401, 403, 404))
-                serialized = json.dumps(logs)
-                self.assertNotIn("DemoPass!23", serialized)
-                self.assertNotIn("pbkdf2_sha256$", serialized)
-                return
+        aru_status, _, logs = invoke("GET", "/api/audit-logs", cookie=aru_cookie)
+        self.assertEqual(aru_status, 200)
+        self.assertEqual(invoke("GET", "/api/audit-logs", cookie=dias_cookie)[0], 403)
+        self.assertEqual(invoke("GET", "/api/audit-logs")[0], 401)
+        serialized = json.dumps(logs)
+        self.assertNotIn("DemoPass!23", serialized)
+        self.assertNotIn("pbkdf2_sha256$", serialized)
 
-        # Fallback: verify all core customer endpoints never expose password hashes or session tokens
+        # Core customer endpoints must also avoid exposing authentication secrets.
         for path in ("/api/accounts", "/api/transfers", "/api/recipients", "/api/limits"):
             status, _, payload = invoke("GET", path, cookie=aru_cookie)
             self.assertEqual(status, 200)
@@ -445,4 +441,3 @@ class BankSystemChecks(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
-    

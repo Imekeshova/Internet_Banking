@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f7f4"><title>Internet Banking Demo</title>
+  <meta name="theme-color" content="#f5f7f4"><title data-i18n="pageTitle">Internet Banking Demo</title>
   <style>
     :root{--ink:#152923;--muted:#718078;--green:#176b52;--green2:#e7f3ed;--line:#e7ece8;--paper:#fff;--bg:#f5f7f4;--red:#b34035;--amber:#a66b12;--shadow:0 16px 50px #233b3010}
     *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}
@@ -15,93 +15,690 @@
     @media(max-width:820px){main{margin-top:24px}.layout{grid-template-columns:1fr}.greeting{align-items:flex-start;gap:14px;flex-direction:column}.switcher{align-self:stretch}.switcher select{flex:1}.balance-card{min-height:195px}}
     @media(max-width:520px){.top{height:62px;padding:0 17px}.topright>span{display:none}main{padding:0 14px}.greeting h1{font-size:25px}.transfer-card,.history{padding:18px 16px}.table th:nth-child(2),.table td:nth-child(2){display:none}.table td{padding:12px 5px}.balance{font-size:33px}.auth-wrap{margin:28px auto;padding:0 14px}.auth-card{padding:21px}}
     .history-filters{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr auto;gap:8px;margin-bottom:12px}.history-filters input,.history-filters select{min-width:0;width:100%;padding:8px 9px;font-size:12px}.history-filters button{white-space:nowrap}@media(max-width:1000px){.history-filters{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:520px){.history-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.history-filters input[type=search]{grid-column:1/-1}}
+    .top-actions{display:flex;align-items:center;gap:14px}.language-control{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}.language-control select{padding:7px 9px}.top{min-height:72px;height:auto;padding-top:12px;padding-bottom:12px;gap:14px}.topright{flex-wrap:wrap}.detail-actions .primary{width:auto}@media(max-width:680px){.top{flex-wrap:wrap}.top-actions{flex:1;justify-content:flex-end;flex-wrap:wrap;gap:8px}.topright{justify-content:flex-end}.language-control span{display:none}.brand small{font-size:9px}}
   </style>
 </head>
 <body>
-  <header class="top"><div class="brand"><div class="brandmark">↗</div><div>Northstar Bank<small>INTERNET BANKING DEMO</small></div></div><div class="topright hidden" id="userBar"><button class="hidden" id="auditToggle" type="button">Audit log</button><span id="userEmail"></span><div class="avatar" id="avatar">A</div><button id="logoutButton">Sign out</button></div></header>
+  <header class="top"><div class="brand"><div class="brandmark">↗</div><div>Northstar Bank<small data-i18n="brandSubtitle">INTERNET BANKING DEMO</small></div></div><div class="top-actions"><label class="language-control"><span data-i18n="language">Language</span><select id="languageSelect" data-i18n-aria="language"><option value="en" lang="en">English</option><option value="ru" lang="ru">Русский</option></select></label><div class="topright hidden" id="userBar"><button class="hidden" id="auditToggle" type="button" data-i18n="auditLog">Audit log</button><span id="userEmail"></span><div class="avatar" id="avatar">A</div><button id="logoutButton" data-i18n="signOut">Sign out</button></div></div></header>
   <main id="authView" class="auth-wrap hidden">
-    <section class="card auth-card"><div class="eyebrow">Secure access</div><h1 id="authTitle">Welcome back</h1><p id="authSubtitle">Sign in to view your demo account.</p>
-      <div class="auth-switch" id="authSwitch"><button id="loginTab" class="active" type="button">Sign in</button><button id="registerTab" type="button">Create account</button></div>
-      <form id="authForm"><div class="field hidden" id="nameField"><label for="authName">Full name</label><input id="authName" autocomplete="name" maxlength="80"></div>
-        <div class="field"><label for="authEmail">Email</label><input id="authEmail" type="email" autocomplete="username" required maxlength="254"></div>
-        <div class="field"><label for="authPassword">Password</label><input id="authPassword" type="password" autocomplete="current-password" required maxlength="128"></div>
-        <div class="field hidden" id="confirmField"><label for="authPasswordConfirm">Confirm password</label><input id="authPasswordConfirm" type="password" autocomplete="new-password" maxlength="128"></div>
-        <button class="primary" id="authButton" type="submit">Sign in</button><button class="rowaction" id="forgotButton" type="button">Forgot password?</button></form>
-      <form id="passwordResetForm" class="hidden"><div class="field"><label for="resetEmail">Account email</label><input id="resetEmail" type="email" autocomplete="username" required maxlength="254"></div>
-        <div class="field"><label for="oldPassword">Old password</label><input id="oldPassword" type="password" autocomplete="current-password" required maxlength="128"></div>
-        <div class="field"><label for="newPassword">New password</label><input id="newPassword" type="password" autocomplete="new-password" minlength="12" required maxlength="128"></div>
-        <div class="field"><label for="newPasswordConfirm">Confirm new password</label><input id="newPasswordConfirm" type="password" autocomplete="new-password" minlength="12" required maxlength="128"></div>
-        <button class="primary" id="resetButton" type="submit">Update password</button><button class="rowaction" id="backToLogin" type="button">Back to sign in</button></form>
+    <section class="card auth-card"><div class="eyebrow" data-i18n="secureAccess">Secure access</div><h1 id="authTitle" data-i18n="welcome">Welcome back</h1><p id="authSubtitle" data-i18n="loginSubtitle">Sign in to view your demo account.</p>
+      <div class="auth-switch" id="authSwitch"><button id="loginTab" class="active" type="button" data-i18n="signIn">Sign in</button><button id="registerTab" type="button" data-i18n="createAccount">Create account</button></div>
+      <form id="authForm"><div class="field hidden" id="nameField"><label for="authName" data-i18n="fullName">Full name</label><input id="authName" autocomplete="name" minlength="2" maxlength="80"></div>
+        <div class="field"><label for="authEmail" data-i18n="email">Email</label><input id="authEmail" type="email" autocomplete="username" required maxlength="254"></div>
+        <div class="field"><label for="authPassword" data-i18n="password">Password</label><input id="authPassword" type="password" autocomplete="current-password" required maxlength="128"></div>
+        <div class="field hidden" id="confirmField"><label for="authPasswordConfirm" data-i18n="confirmPassword">Confirm password</label><input id="authPasswordConfirm" type="password" autocomplete="new-password" maxlength="128"></div>
+        <button class="primary" id="authButton" type="submit" data-i18n="signIn">Sign in</button><button class="rowaction" id="forgotButton" type="button" data-i18n="forgotPassword">Forgot password?</button></form>
+      <form id="passwordResetForm" class="hidden"><div class="field"><label for="resetEmail" data-i18n="accountEmail">Account email</label><input id="resetEmail" type="email" autocomplete="username" required maxlength="254"></div>
+        <div class="field"><label for="oldPassword" data-i18n="oldPassword">Old password</label><input id="oldPassword" type="password" autocomplete="current-password" required maxlength="128"></div>
+        <div class="field"><label for="newPassword" data-i18n="newPassword">New password</label><input id="newPassword" type="password" autocomplete="new-password" minlength="12" required maxlength="128"></div>
+        <div class="field"><label for="newPasswordConfirm" data-i18n="confirmNewPassword">Confirm new password</label><input id="newPasswordConfirm" type="password" autocomplete="new-password" minlength="12" required maxlength="128"></div>
+        <button class="primary" id="resetButton" type="submit" data-i18n="updatePassword">Update password</button><button class="rowaction" id="backToLogin" type="button" data-i18n="backToSignIn">Back to sign in</button></form>
       <div class="notice" id="authNotice" role="status" aria-live="polite"></div>
-      <div class="demo-login" id="demoLogin"><strong>Demo sign-in</strong><br>Email <code>aruzhan@example.test</code><br>Password <code>DemoPass!23</code></div>
+      <div class="demo-login" id="demoLogin"><strong data-i18n="demoSignIn">Demo sign-in</strong><br><span data-i18n="email">Email</span> <code>aruzhan@example.test</code><br><span data-i18n="password">Password</span> <code>DemoPass!23</code></div>
     </section>
   </main>
   <main id="bankView" class="hidden">
-    <div class="greeting"><div><div class="eyebrow">Personal banking</div><h1>Good day, <span id="customerName">—</span></h1></div><label class="switcher">Your account <select id="accountSelect" aria-label="Choose account"></select></label></div>
+    <div class="greeting"><div><div class="eyebrow" data-i18n="personalBanking">Personal banking</div><h1><span data-i18n="greeting">Good day,</span> <span id="customerName">—</span></h1></div><label class="switcher"><span data-i18n="yourAccount">Your account</span> <select id="accountSelect" aria-label="Choose account" data-i18n-aria="chooseAccount"></select></label></div>
     <div class="layout"><div>
-      <section class="card balance-card" aria-label="Account balance"><div class="balance-label">Available balance</div><div class="balance" id="balance">₸—</div><div class="card-bottom"><div><span id="accountLabel">Account</span><strong id="accountNumber">••••</strong></div><div class="account-icon">₸</div></div></section>
-      <section class="card history lower"><div class="sectionhead"><h2>Recent activity</h2><span id="transferCount">Latest activity</span></div><div class="history-filters" aria-label="Search and filter transfers"><input id="historySearch" type="search" placeholder="Search recipient, description, or reference" aria-label="Search transfers"><select id="historyStatus" aria-label="Filter by status"><option value="">All statuses</option><option>Pending</option><option>Completed</option><option>Failed</option><option>Scheduled</option><option>Cancelled</option></select><input id="historyFrom" type="date" aria-label="From date"><input id="historyTo" type="date" aria-label="To date"><input id="historyMin" type="number" min="0" step="0.01" placeholder="Min KZT" aria-label="Minimum amount"><input id="historyMax" type="number" min="0" step="0.01" placeholder="Max KZT" aria-label="Maximum amount"><button id="clearHistoryFilters" class="rowaction" type="button">Clear filters</button></div><div id="historyBody" class="empty">Loading activity…</div></section>
+      <section class="card balance-card" aria-label="Account balance" data-i18n-aria="accountBalance"><div class="balance-label" data-i18n="availableBalance">Available balance</div><div class="balance" id="balance">₸—</div><div class="card-bottom"><div><span id="accountLabel" data-i18n="account">Account</span><strong id="accountNumber">••••</strong></div><div class="account-icon">₸</div></div></section>
+      <section class="card history lower"><div class="sectionhead"><h2 data-i18n="recentActivity">Recent activity</h2><span id="transferCount" data-i18n="latestActivity">Latest activity</span></div><div class="history-filters" aria-label="Search and filter transfers" data-i18n-aria="searchFilterTransfers"><input id="historySearch" type="search" placeholder="Search recipient, description, or reference" data-i18n-placeholder="searchPlaceholder" aria-label="Search transfers" data-i18n-aria="searchTransfers"><select id="historyStatus" aria-label="Filter by status" data-i18n-aria="filterStatus"><option value="" data-i18n="allStatuses">All statuses</option><option value="Pending" data-i18n="statusPending">Pending</option><option value="Completed" data-i18n="statusCompleted">Completed</option><option value="Failed" data-i18n="statusFailed">Failed</option><option value="Scheduled" data-i18n="statusScheduled">Scheduled</option><option value="Cancelled" data-i18n="statusCancelled">Cancelled</option></select><input id="historyFrom" type="date" aria-label="From date" data-i18n-aria="fromDate"><input id="historyTo" type="date" aria-label="To date" data-i18n-aria="toDate"><input id="historyMin" type="number" min="0" step="0.01" placeholder="Min KZT" data-i18n-placeholder="minKzt" aria-label="Minimum amount" data-i18n-aria="minimumAmount"><input id="historyMax" type="number" min="0" step="0.01" placeholder="Max KZT" data-i18n-placeholder="maxKzt" aria-label="Maximum amount" data-i18n-aria="maximumAmount"><button id="clearHistoryFilters" class="rowaction" type="button" data-i18n="clearFilters">Clear filters</button></div><div id="historyBody" class="empty" data-i18n="loadingActivity">Loading activity…</div></section>
     </div>
-    <section class="card transfer-card"><div class="sectionhead"><h2>Make a transfer</h2><span>Within Northstar</span></div>
-      <form id="transferForm"><div class="field"><label for="recipient">Send to</label><select id="recipient" required></select></div>
-        <div class="field"><label for="amount">Amount</label><div class="amountbox"><input id="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required><span class="currency">KZT</span></div></div>
-        <div class="field"><label for="transferMode">When</label><select id="transferMode"><option value="now">Send now</option><option value="scheduled">Schedule for later</option></select></div>
-        <div class="field scheduled-field hidden" id="scheduledField"><label for="scheduledFor">Scheduled date and time (UTC+5)</label><input id="scheduledFor" type="datetime-local"></div>
-        <div class="field"><label for="description"><span id="noteLabel">Description</span> <span class="muted">(optional)</span></label><textarea id="description" maxlength="200" placeholder="For example: send money to Aigul for utility bills"></textarea></div>
-        <button class="primary" id="submitButton" type="submit">Send transfer</button></form>
-      <div class="limits" id="limitText">Loading transfer limits…</div><div class="notice" id="notice" role="status" aria-live="polite"></div>
-      <div class="idline"><span>Transfer reference</span><code id="requestId">Created when you send</code></div>
-      <p class="transfer-note" id="transferHint">A new transfer is held as Pending before it is processed.</p>
+    <section class="card transfer-card"><div class="sectionhead"><h2 data-i18n="makeTransfer">Make a transfer</h2><span data-i18n="withinBank">Within Northstar</span></div>
+      <form id="transferForm"><div class="field"><label for="recipient" data-i18n="sendTo">Send to</label><select id="recipient" required></select></div>
+        <div class="field"><label for="amount" data-i18n="amount">Amount</label><div class="amountbox"><input id="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required><span class="currency">KZT</span></div></div>
+        <div class="field"><label for="transferMode" data-i18n="when">When</label><select id="transferMode"><option value="now" data-i18n="sendNow">Send now</option><option value="scheduled" data-i18n="scheduleLater">Schedule for later</option></select></div>
+        <div class="field scheduled-field hidden" id="scheduledField"><label for="scheduledFor" data-i18n="scheduledDate">Scheduled date and time (UTC+5)</label><input id="scheduledFor" type="datetime-local"></div>
+        <div class="field"><label for="description"><span id="noteLabel" data-i18n="description">Description</span> <span class="muted" data-i18n="optional">(optional)</span></label><textarea id="description" maxlength="200" placeholder="For example: send money to Aigul for utility bills" data-i18n-placeholder="descriptionPlaceholder"></textarea></div>
+        <button class="primary" id="submitButton" type="submit" data-i18n="sendTransfer">Send transfer</button></form>
+      <div class="limits" id="limitText" data-i18n="loadingLimits">Loading transfer limits…</div><div class="notice" id="notice" role="status" aria-live="polite"></div>
+      <div class="idline"><span data-i18n="transferReference">Transfer reference</span><code id="requestId" data-i18n="createdWhenSent">Created when you send</code></div>
+      <p class="transfer-note" id="transferHint" data-i18n="pendingHint">A new transfer is held as Pending before it is processed.</p>
     </section></div>
-    <dialog class="details-dialog" id="detailsDialog" aria-labelledby="detailsTitle"><section class="card details-card"><div class="sectionhead"><h2 id="detailsTitle">Transfer details</h2><button class="rowaction" id="closeDetails" type="button">Close</button></div><div id="detailsBody"></div><div class="detail-actions"><button class="primary" id="downloadDetailReceipt" type="button">Download receipt</button></div></section></dialog>
-    <section class="card audit-card hidden" id="auditPanel"><div class="sectionhead"><h2>Audit log</h2><span>Latest events for your account</span></div><div id="auditBody" class="empty">Select Audit log to load events.</div></section>
-    <div class="foot">Demo environment · Sample balances · No real money is moved</div>
+    <dialog class="details-dialog" id="detailsDialog" aria-labelledby="detailsTitle"><section class="card details-card"><div class="sectionhead"><h2 id="detailsTitle" data-i18n="transferDetails">Transfer details</h2><button class="rowaction" id="closeDetails" type="button" data-i18n="close">Close</button></div><div id="detailsBody"></div><div class="detail-actions"><button class="primary" id="downloadDetailReceipt" type="button" data-i18n="downloadReceipt">Download receipt</button></div></section></dialog>
+    <section class="card audit-card hidden" id="auditPanel"><div class="sectionhead"><h2 data-i18n="auditLog">Audit log</h2><span data-i18n="latestEvents">Latest events for your account</span></div><div id="auditBody" class="empty" data-i18n="selectAudit">Select Audit log to load events.</div></section>
+    <div class="foot" data-i18n="demoFooter">Demo environment · Sample balances · No real money is moved</div>
   </main>
 <script>
+  // i18n-catalog:start
+  const I18N = {
+  "en": {
+    "pageTitle": "Internet Banking Demo",
+    "brandSubtitle": "INTERNET BANKING DEMO",
+    "language": "Language",
+    "signOut": "Sign out",
+    "secureAccess": "Secure access",
+    "signIn": "Sign in",
+    "createAccount": "Create account",
+    "welcome": "Welcome back",
+    "loginSubtitle": "Sign in to view your demo account.",
+    "registerTitle": "Create your account",
+    "registerSubtitle": "Register for a local demo account.",
+    "fullName": "Full name",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm password",
+    "forgotPassword": "Forgot password?",
+    "accountEmail": "Account email",
+    "oldPassword": "Old password",
+    "newPassword": "New password",
+    "confirmNewPassword": "Confirm new password",
+    "updatePassword": "Update password",
+    "backToSignIn": "Back to sign in",
+    "changePassword": "Change your password",
+    "changePasswordSubtitle": "Enter your email and old password, then choose and confirm a new password.",
+    "demoSignIn": "Demo sign-in",
+    "personalBanking": "Personal banking",
+    "greeting": "Good day,",
+    "yourAccount": "Your account",
+    "chooseAccount": "Choose account",
+    "accountBalance": "Account balance",
+    "availableBalance": "Available balance",
+    "account": "Account",
+    "everydayAccount": "Everyday account",
+    "savingsAccount": "Savings account",
+    "recentActivity": "Recent activity",
+    "latestActivity": "Latest activity",
+    "searchFilterTransfers": "Search and filter transfers",
+    "searchPlaceholder": "Search recipient, description, or reference",
+    "searchTransfers": "Search transfers",
+    "filterStatus": "Filter by status",
+    "allStatuses": "All statuses",
+    "statusPending": "Pending",
+    "statusCompleted": "Completed",
+    "statusFailed": "Failed",
+    "statusScheduled": "Scheduled",
+    "statusCancelled": "Cancelled",
+    "fromDate": "From date (UTC+5)",
+    "toDate": "To date (UTC+5)",
+    "minKzt": "Min KZT",
+    "maxKzt": "Max KZT",
+    "minimumAmount": "Minimum amount",
+    "maximumAmount": "Maximum amount",
+    "clearFilters": "Clear filters",
+    "loadingActivity": "Loading activity…",
+    "makeTransfer": "Make a transfer",
+    "withinBank": "Within Northstar",
+    "sendTo": "Send to",
+    "amount": "Amount",
+    "when": "When",
+    "sendNow": "Send now",
+    "scheduleLater": "Schedule for later",
+    "scheduledDate": "Scheduled date and time (UTC+5)",
+    "description": "Description",
+    "reminderNote": "Reminder note",
+    "optional": "(optional)",
+    "descriptionPlaceholder": "For example: send money to Aigul for utility bills",
+    "sendTransfer": "Send transfer",
+    "scheduleTransfer": "Schedule transfer",
+    "submitting": "Submitting…",
+    "scheduling": "Scheduling…",
+    "loadingLimits": "Loading transfer limits…",
+    "transferReference": "Transfer reference",
+    "createdWhenSent": "Created when you send",
+    "pendingHint": "A new transfer is held as Pending before it is processed.",
+    "scheduledHint": "We will check your balance and daily limit at the scheduled time. You can cancel before processing.",
+    "transferDetails": "Transfer details",
+    "close": "Close",
+    "downloadReceipt": "Download receipt",
+    "auditLog": "Audit log",
+    "hideAuditLog": "Hide audit log",
+    "latestEvents": "Latest events for your account",
+    "selectAudit": "Select Audit log to load events.",
+    "demoFooter": "Demo environment · Sample balances · No real money is moved",
+    "limits": "Per transfer: {minimum}–{maximum} · Daily limit: {daily} · Used today: {used} · Remaining: {remaining}.",
+    "transferCount": "{filtered} of {total} transfers",
+    "noTransfers": "No transfers yet. Your activity will appear here.",
+    "noMatches": "No transfers match these search and filter settings.",
+    "otherAccount": "Other account",
+    "reference": "Reference",
+    "status": "Status",
+    "transfer": "Transfer",
+    "cancel": "Cancel",
+    "noAudit": "No audit events yet.",
+    "time": "Time",
+    "event": "Event",
+    "details": "Details",
+    "scheduledFor": "Scheduled for",
+    "failureReason": "Failure reason",
+    "descriptionReminder": "Description / reminder",
+    "recipient": "Recipient",
+    "latestStatus": "Latest status",
+    "lastChecked": "Last checked",
+    "date": "Date",
+    "receiptTitle": "Transfer receipt",
+    "receiptNote": "Demo receipt · No real money is moved.",
+    "printReceipt": "Print / Save as PDF",
+    "receiptLoading": "Loading the latest transfer status…",
+    "cancelledNotice": "Scheduled transfer {reference} was cancelled.",
+    "scheduledNotice": "Transfer scheduled for {date}. Reminder: {description}. Reference {reference}.",
+    "transferNotice": "Transfer: {status} · {amount} to {recipient}. Reference {reference}.",
+    "retryNotice": "Safe retry returned {status}. It uses the same transfer reference.",
+    "none": "none",
+    "viewDetails": "View details",
+    "cancelSchedule": "Cancel scheduled transfer",
+    "newTransfer": "New transfer",
+    "retry": "Retry same request",
+    "digitalReceipt": "Digital receipt",
+    "popups": "Allow pop-ups to open your digital receipt.",
+    "passwordChanged": "Password changed. Please sign in with your new password.",
+    "sessionExpired": "Your session expired. Please sign in again.",
+    "requestFailed": "Request failed. Please try again.",
+    "networkError": "Could not connect to the server. Please try again.",
+    "noAccount": "No account is linked to this sign-in.",
+    "requiredField": "Please fill in this field.",
+    "validEmail": "Enter a valid email address",
+    "tooShort": "Use at least {min} characters.",
+    "tooLong": "Use at most {max} characters.",
+    "valueMinimum": "Enter a value of {min} or greater.",
+    "valueMaximum": "Enter a value of {max} or less.",
+    "validStep": "Enter a valid value with up to 2 decimal places.",
+    "validValue": "Please enter a valid value.",
+    "positiveAmount": "Enter a positive amount with up to 2 decimal places",
+    "validAmount": "Enter a valid transfer amount",
+    "validSchedule": "Choose a valid scheduled date and time",
+    "requestLarge": "Request is too large",
+    "invalidRequest": "Invalid request",
+    "invalidRequestData": "Invalid request data",
+    "signInRequired": "Please sign in to continue",
+    "tokenExpired": "Security token expired. Refresh the page and try again",
+    "auditDenied": "Audit log access is limited to aruzhan@example.test",
+    "transferNotFound": "Transfer not found",
+    "notFound": "Not found",
+    "scheduledNotFound": "Scheduled transfer not found",
+    "cannotCancel": "This transfer is already {status} and cannot be cancelled",
+    "invalidReference": "Transfer reference is invalid. Please start a new transfer",
+    "descriptionLong": "Description must be 200 characters or fewer",
+    "invalidTransfer": "Invalid transfer",
+    "differentRecipient": "Choose one of your accounts and a different recipient",
+    "referenceScheduled": "This reference is already attached to a scheduled transfer",
+    "referenceMismatch": "This reference is already attached to different transfer details",
+    "minimumTransfer": "Minimum transfer is {amount}",
+    "maximumTransfer": "Maximum per transfer is {amount}",
+    "dailyExceeded": "Daily transfer limit is {limit}. Remaining today: {remaining}",
+    "scheduleFuture": "Choose a time at least 30 seconds in the future",
+    "scheduleYear": "Transfers can be scheduled up to 365 days ahead",
+    "reminderLong": "Reminder note must be 200 characters or fewer",
+    "invalidScheduled": "Invalid scheduled transfer",
+    "referenceUsed": "This transfer reference is already in use",
+    "enterOldPassword": "Enter your old password",
+    "passwordLength": "Password must be 12–128 characters",
+    "newPasswordLength": "New password must be 12–128 characters",
+    "passwordMismatch": "Passwords do not match",
+    "newPasswordMismatch": "New passwords do not match",
+    "passwordDifferent": "Choose a new password different from the old password",
+    "invalidPassword": "Invalid password details",
+    "wrongOldPassword": "Email or old password is incorrect",
+    "nameLength": "Name must be between 2 and 80 characters",
+    "enterPassword": "Enter your password",
+    "invalidDetails": "Invalid details",
+    "emailExists": "An account with this email already exists",
+    "wrongPassword": "Email or password is incorrect",
+    "insufficientFunds": "Insufficient funds",
+    "unavailableAccount": "Account is no longer available",
+    "amountBelow": "Amount is below the minimum transfer limit",
+    "amountAbove": "Amount exceeds the maximum per-transfer limit",
+    "dailyWouldExceed": "Daily transfer limit would be exceeded",
+    "insufficientScheduled": "Insufficient funds at scheduled time",
+    "auditTransferFailed": "Transfer failed",
+    "auditTransferCompleted": "Transfer completed",
+    "auditScheduledFailed": "Scheduled transfer failed",
+    "auditScheduledCompleted": "Scheduled transfer completed",
+    "auditDetailsViewed": "Transfer details viewed",
+    "auditSignedOut": "User signed out",
+    "auditCancelled": "Scheduled transfer cancelled",
+    "auditRetry": "Transfer retry received",
+    "auditRejected": "Transfer rejected",
+    "auditSubmitted": "Transfer submitted",
+    "auditScheduledCreated": "Scheduled transfer created",
+    "auditPasswordChanged": "Password changed",
+    "auditRegistered": "Account registered",
+    "auditSignedIn": "User signed in",
+    "auditNotSent": "{amount} was not sent: {reason}.",
+    "auditCompleted": "{amount} transfer completed.",
+    "auditScheduledDone": "{amount} scheduled transfer completed.",
+    "auditCreationFailed": "The transfer could not be created: {reason}.",
+    "auditViewed": "Viewed transfer details; latest status is {status}.",
+    "auditUserOut": "{name} signed out.",
+    "auditCancelAmount": "Cancelled scheduled payment for {amount}.",
+    "auditRetryDetails": "Repeated request returned existing {status} transfer; no second debit was made.",
+    "auditBelow": "Rejected {amount} amount below the minimum limit.",
+    "auditAbove": "Rejected {amount} amount above the maximum limit.",
+    "auditDaily": "Rejected because the daily limit would be exceeded; {amount} remained.",
+    "auditSent": "Submitted {amount} to {name}; current status is {status}.",
+    "auditScheduled": "Scheduled {amount} for {date}. Reminder: {reminder}.",
+    "noReminder": "No reminder note",
+    "auditPasswordDetails": "{name} changed the account password. All active sessions were signed out.",
+    "auditUserRegistered": "{name} account registered.",
+    "auditUserIn": "{name} user signed in."
+  },
+  "ru": {
+    "pageTitle": "Интернет-банкинг — демоверсия",
+    "brandSubtitle": "ДЕМО ИНТЕРНЕТ-БАНКИНГА",
+    "language": "Язык",
+    "signOut": "Выйти",
+    "secureAccess": "Безопасный вход",
+    "signIn": "Войти",
+    "createAccount": "Регистрация",
+    "welcome": "С возвращением",
+    "loginSubtitle": "Войдите, чтобы открыть свой демосчёт.",
+    "registerTitle": "Создайте аккаунт",
+    "registerSubtitle": "Зарегистрируйте аккаунт для локальной демоверсии.",
+    "fullName": "Полное имя",
+    "email": "Электронная почта",
+    "password": "Пароль",
+    "confirmPassword": "Подтвердите пароль",
+    "forgotPassword": "Забыли пароль?",
+    "accountEmail": "Почта аккаунта",
+    "oldPassword": "Старый пароль",
+    "newPassword": "Новый пароль",
+    "confirmNewPassword": "Подтвердите новый пароль",
+    "updatePassword": "Обновить пароль",
+    "backToSignIn": "Вернуться ко входу",
+    "changePassword": "Смена пароля",
+    "changePasswordSubtitle": "Введите почту и старый пароль, затем задайте и подтвердите новый пароль.",
+    "demoSignIn": "Данные для демовхода",
+    "personalBanking": "Личный кабинет",
+    "greeting": "Здравствуйте,",
+    "yourAccount": "Ваш счёт",
+    "chooseAccount": "Выберите счёт",
+    "accountBalance": "Баланс счёта",
+    "availableBalance": "Доступный баланс",
+    "account": "Счёт",
+    "everydayAccount": "Текущий счёт",
+    "savingsAccount": "Сберегательный счёт",
+    "recentActivity": "История операций",
+    "latestActivity": "Последние операции",
+    "searchFilterTransfers": "Поиск и фильтрация переводов",
+    "searchPlaceholder": "Получатель, описание или номер перевода",
+    "searchTransfers": "Поиск переводов",
+    "filterStatus": "Фильтр по статусу",
+    "allStatuses": "Все статусы",
+    "statusPending": "В обработке",
+    "statusCompleted": "Выполнен",
+    "statusFailed": "Не выполнен",
+    "statusScheduled": "Запланирован",
+    "statusCancelled": "Отменён",
+    "fromDate": "Дата начала (UTC+5)",
+    "toDate": "Дата окончания (UTC+5)",
+    "minKzt": "Мин. KZT",
+    "maxKzt": "Макс. KZT",
+    "minimumAmount": "Минимальная сумма",
+    "maximumAmount": "Максимальная сумма",
+    "clearFilters": "Сбросить фильтры",
+    "loadingActivity": "Загрузка операций…",
+    "makeTransfer": "Новый перевод",
+    "withinBank": "Внутри Northstar",
+    "sendTo": "Кому",
+    "amount": "Сумма",
+    "when": "Когда",
+    "sendNow": "Сейчас",
+    "scheduleLater": "Запланировать",
+    "scheduledDate": "Дата и время перевода (UTC+5)",
+    "description": "Описание",
+    "reminderNote": "Напоминание",
+    "optional": "(необязательно)",
+    "descriptionPlaceholder": "Например: отправить Айгуль деньги за коммунальные услуги",
+    "sendTransfer": "Отправить перевод",
+    "scheduleTransfer": "Запланировать перевод",
+    "submitting": "Отправка…",
+    "scheduling": "Планирование…",
+    "loadingLimits": "Загрузка лимитов…",
+    "transferReference": "Номер перевода",
+    "createdWhenSent": "Появится при отправке",
+    "pendingHint": "Новый перевод получает статус «В обработке», затем выполняется.",
+    "scheduledHint": "В назначенное время мы проверим баланс и дневной лимит. До выполнения перевод можно отменить.",
+    "transferDetails": "Детали перевода",
+    "close": "Закрыть",
+    "downloadReceipt": "Скачать квитанцию",
+    "auditLog": "Журнал событий",
+    "hideAuditLog": "Скрыть журнал",
+    "latestEvents": "Последние события вашего аккаунта",
+    "selectAudit": "Откройте журнал, чтобы загрузить события.",
+    "demoFooter": "Демоверсия · Учебные балансы · Реальные деньги не переводятся",
+    "limits": "За один перевод: {minimum}–{maximum} · Дневной лимит: {daily} · Использовано сегодня: {used} · Осталось: {remaining}.",
+    "transferCount": "Показано переводов: {filtered} из {total}",
+    "noTransfers": "Переводов пока нет. Здесь появится история операций.",
+    "noMatches": "По выбранным условиям переводы не найдены.",
+    "otherAccount": "Другой участник",
+    "reference": "Номер перевода",
+    "status": "Статус",
+    "transfer": "Перевод",
+    "cancel": "Отменить",
+    "noAudit": "Событий пока нет.",
+    "time": "Время",
+    "event": "Событие",
+    "details": "Подробности",
+    "scheduledFor": "Запланировано на",
+    "failureReason": "Причина отказа",
+    "descriptionReminder": "Описание / напоминание",
+    "recipient": "Получатель",
+    "latestStatus": "Текущий статус",
+    "lastChecked": "Последняя проверка",
+    "date": "Дата",
+    "receiptTitle": "Квитанция о переводе",
+    "receiptNote": "Учебная квитанция · Реальные деньги не переводятся.",
+    "printReceipt": "Печать / сохранить PDF",
+    "receiptLoading": "Загрузка актуального статуса перевода…",
+    "cancelledNotice": "Запланированный перевод {reference} отменён.",
+    "scheduledNotice": "Перевод запланирован на {date}. Напоминание: {description}. Номер: {reference}.",
+    "transferNotice": "Перевод: {status} · {amount}, получатель: {recipient}. Номер: {reference}.",
+    "retryNotice": "Повторный запрос вернул статус «{status}». Номер перевода остался прежним.",
+    "none": "нет",
+    "viewDetails": "Посмотреть детали",
+    "cancelSchedule": "Отменить запланированный перевод",
+    "newTransfer": "Новый перевод",
+    "retry": "Повторить тот же запрос",
+    "digitalReceipt": "Электронная квитанция",
+    "popups": "Разрешите всплывающие окна, чтобы открыть квитанцию.",
+    "passwordChanged": "Пароль изменён. Войдите с новым паролем.",
+    "sessionExpired": "Сессия завершена. Войдите ещё раз.",
+    "requestFailed": "Не удалось выполнить запрос. Попробуйте ещё раз.",
+    "networkError": "Не удалось подключиться к серверу. Попробуйте ещё раз.",
+    "noAccount": "К этому аккаунту не привязан счёт.",
+    "requiredField": "Заполните это поле.",
+    "validEmail": "Введите корректный адрес электронной почты",
+    "tooShort": "Введите не менее {min} символов.",
+    "tooLong": "Введите не более {max} символов.",
+    "valueMinimum": "Введите значение не меньше {min}.",
+    "valueMaximum": "Введите значение не больше {max}.",
+    "validStep": "Введите число с точностью до двух знаков после запятой.",
+    "validValue": "Введите корректное значение.",
+    "positiveAmount": "Введите положительную сумму с точностью до двух знаков после запятой",
+    "validAmount": "Введите корректную сумму перевода",
+    "validSchedule": "Выберите корректные дату и время перевода",
+    "requestLarge": "Запрос слишком большой",
+    "invalidRequest": "Некорректный запрос",
+    "invalidRequestData": "Некорректные данные запроса",
+    "signInRequired": "Войдите, чтобы продолжить",
+    "tokenExpired": "Срок действия защитного токена истёк. Обновите страницу и попробуйте ещё раз",
+    "auditDenied": "Журнал событий доступен только aruzhan@example.test",
+    "transferNotFound": "Перевод не найден",
+    "notFound": "Не найдено",
+    "scheduledNotFound": "Запланированный перевод не найден",
+    "cannotCancel": "Статус перевода уже «{status}», отмена недоступна",
+    "invalidReference": "Некорректный номер перевода. Начните новый перевод",
+    "descriptionLong": "Описание не должно превышать 200 символов",
+    "invalidTransfer": "Некорректный перевод",
+    "differentRecipient": "Выберите свой счёт и другого получателя",
+    "referenceScheduled": "Этот номер уже используется для запланированного перевода",
+    "referenceMismatch": "Этот номер уже используется для перевода с другими реквизитами",
+    "minimumTransfer": "Минимальная сумма перевода: {amount}",
+    "maximumTransfer": "Максимальная сумма за один перевод: {amount}",
+    "dailyExceeded": "Дневной лимит переводов: {limit}. Осталось сегодня: {remaining}",
+    "scheduleFuture": "Выберите время не раньше чем через 30 секунд",
+    "scheduleYear": "Перевод можно запланировать максимум на 365 дней вперёд",
+    "reminderLong": "Напоминание не должно превышать 200 символов",
+    "invalidScheduled": "Некорректный запланированный перевод",
+    "referenceUsed": "Этот номер перевода уже используется",
+    "enterOldPassword": "Введите старый пароль",
+    "passwordLength": "Пароль должен содержать от 12 до 128 символов",
+    "newPasswordLength": "Новый пароль должен содержать от 12 до 128 символов",
+    "passwordMismatch": "Пароли не совпадают",
+    "newPasswordMismatch": "Новые пароли не совпадают",
+    "passwordDifferent": "Новый пароль должен отличаться от старого",
+    "invalidPassword": "Некорректные данные пароля",
+    "wrongOldPassword": "Неверная почта или старый пароль",
+    "nameLength": "Имя должно содержать от 2 до 80 символов",
+    "enterPassword": "Введите пароль",
+    "invalidDetails": "Некорректные данные",
+    "emailExists": "Аккаунт с этой почтой уже существует",
+    "wrongPassword": "Неверная почта или пароль",
+    "insufficientFunds": "Недостаточно средств",
+    "unavailableAccount": "Счёт больше недоступен",
+    "amountBelow": "Сумма меньше минимального лимита перевода",
+    "amountAbove": "Сумма превышает лимит за один перевод",
+    "dailyWouldExceed": "Будет превышен дневной лимит переводов",
+    "insufficientScheduled": "В назначенное время недостаточно средств",
+    "auditTransferFailed": "Перевод не выполнен",
+    "auditTransferCompleted": "Перевод выполнен",
+    "auditScheduledFailed": "Запланированный перевод не выполнен",
+    "auditScheduledCompleted": "Запланированный перевод выполнен",
+    "auditDetailsViewed": "Просмотрены детали перевода",
+    "auditSignedOut": "Выход из аккаунта",
+    "auditCancelled": "Запланированный перевод отменён",
+    "auditRetry": "Получен повторный запрос",
+    "auditRejected": "Перевод отклонён",
+    "auditSubmitted": "Перевод отправлен",
+    "auditScheduledCreated": "Перевод запланирован",
+    "auditPasswordChanged": "Пароль изменён",
+    "auditRegistered": "Аккаунт зарегистрирован",
+    "auditSignedIn": "Вход в аккаунт",
+    "auditNotSent": "Сумма {amount} не отправлена: {reason}.",
+    "auditCompleted": "Перевод на {amount} выполнен.",
+    "auditScheduledDone": "Запланированный перевод на {amount} выполнен.",
+    "auditCreationFailed": "Не удалось создать перевод: {reason}.",
+    "auditViewed": "Просмотрены детали перевода; текущий статус: {status}.",
+    "auditUserOut": "{name}: выход из аккаунта.",
+    "auditCancelAmount": "Запланированный платёж на {amount} отменён.",
+    "auditRetryDetails": "Повторный запрос вернул существующий перевод со статусом «{status}»; повторного списания не было.",
+    "auditBelow": "Сумма {amount} отклонена: ниже минимального лимита.",
+    "auditAbove": "Сумма {amount} отклонена: выше максимального лимита.",
+    "auditDaily": "Перевод отклонён: будет превышен дневной лимит; оставалось {amount}.",
+    "auditSent": "Отправлено {amount}, получатель: {name}; текущий статус: {status}.",
+    "auditScheduled": "Перевод на {amount} запланирован на {date}. Напоминание: {reminder}.",
+    "noReminder": "Без напоминания",
+    "auditPasswordDetails": "{name}: пароль изменён. Все активные сессии завершены.",
+    "auditUserRegistered": "{name}: аккаунт зарегистрирован.",
+    "auditUserIn": "{name}: вход в аккаунт."
+  }
+};
+  // i18n-catalog:end
+  // API fields, canonical statuses and user-entered content are never translated.
+  const LOCALES = {en:'en-GB', ru:'ru-KZ'};
+  const LANGUAGE_STORAGE_KEY = 'northstar.language';
+  let language = 'en';
+  try { const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY); if (Object.hasOwn(I18N, saved)) language = saved; } catch {}
+  function t(key, params = {}) { return String(I18N[language][key] ?? I18N.en[key] ?? key).replace(/\{(\w+)\}/g, (match, name) => Object.hasOwn(params, name) ? String(params[name]) : match); }
   const $ = id => document.getElementById(id);
-  let csrfToken='', accounts=[], recipients=[], currentId=null, activeRequestId=null, lastTransfer=null, authMode='login', limits={};
-  const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'KZT',minimumFractionDigits:2}).format(n);
-  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const date=s=>new Intl.DateTimeFormat('en-GB',{dateStyle:'medium',timeStyle:'short'}).format(new Date(s));
-  async function api(url,options={}){const method=(options.method||'GET').toUpperCase(),headers={'Content-Type':'application/json',...(options.headers||{})};if(method!=='GET'&&csrfToken)headers['X-CSRF-Token']=csrfToken;const r=await fetch(url,{...options,credentials:'same-origin',headers});let data={};try{data=await r.json()}catch{}if(!r.ok){if(r.status===401&&!['/api/login','/api/register','/api/password/change'].includes(url)){csrfToken='';showAuth('login');notice($('authNotice'),data.error||'Your session expired. Please sign in again.','error');}throw Error(data.error||'Request failed');}return data;}
-  function notice(el,msg,kind='info',actions=''){el.className='notice show '+kind;el.innerHTML=esc(msg)+actions;}
-  function hideNotice(el){el.className='notice';el.textContent='';}
-  function showAuth(mode='login'){authMode=mode;$('authView').classList.remove('hidden');$('bankView').classList.add('hidden');$('userBar').classList.add('hidden');$('authSwitch').classList.remove('hidden');$('authForm').classList.remove('hidden');$('passwordResetForm').classList.add('hidden');$('demoLogin').classList.toggle('hidden',mode!=='login');$('forgotButton').classList.toggle('hidden',mode!=='login');$('nameField').classList.toggle('hidden',mode!=='register');$('confirmField').classList.toggle('hidden',mode!=='register');$('authPassword').autocomplete=mode==='login'?'current-password':'new-password';$('authPassword').minLength=mode==='register'?12:0;$('authPasswordConfirm').required=mode==='register';$('authTitle').textContent=mode==='login'?'Welcome back':'Create your account';$('authSubtitle').textContent=mode==='login'?'Sign in to view your demo account.':'Register for a local demo account.';$('authButton').textContent=mode==='login'?'Sign in':'Create account';$('loginTab').classList.toggle('active',mode==='login');$('registerTab').classList.toggle('active',mode==='register');hideNotice($('authNotice'));}
-  function showPasswordChange(){authMode='password-change';$('authSwitch').classList.add('hidden');$('authForm').classList.add('hidden');$('passwordResetForm').classList.remove('hidden');$('demoLogin').classList.add('hidden');$('authTitle').textContent='Change your password';$('authSubtitle').textContent='Enter your email and old password, then choose and confirm a new password.';$('resetEmail').value=$('authEmail').value.trim();hideNotice($('authNotice'));}
-  function makeRequestId(){const bytes=new Uint8Array(16);crypto.getRandomValues(bytes);return 'TR-'+Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();}
-  async function openBank(user){$('authView').classList.add('hidden');$('bankView').classList.remove('hidden');$('userBar').classList.remove('hidden');$('userEmail').textContent=user.email;$('avatar').textContent=(user.name||'?')[0].toUpperCase();$('customerName').textContent=user.name;const canViewAudit=user.email.toLowerCase()==='aruzhan@example.test';$('auditToggle').classList.toggle('hidden',!canViewAudit);$('auditPanel').classList.add('hidden');$('auditToggle').textContent='Audit log';setScheduledMinimum();await Promise.all([loadLimits(),loadRecipients()]);await loadAccounts();}
-  function setScheduledMinimum(){const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Almaty',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(Date.now()+60000));const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));$('scheduledFor').min=`${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;}
-  async function loadLimits(){limits=await api('/api/limits');$('amount').min=limits.minimum.toFixed(2);$('amount').max=limits.maximum.toFixed(2);$('limitText').textContent=`Per transfer: ${money(limits.minimum)}–${money(limits.maximum)} · Daily limit: ${money(limits.daily)} · Used today: ${money(limits.usedToday)} · Remaining: ${money(limits.remainingToday)}.`;}
-  async function loadRecipients(){recipients=await api('/api/recipients');renderRecipients();}
-  function renderRecipients(){const chosen=$('recipient').value;$('recipient').innerHTML=recipients.map(r=>`<option value="${r.id}">${esc(r.name)} · ${esc(r.number)}</option>`).join('');if(recipients.some(r=>String(r.id)===chosen))$('recipient').value=chosen;}
-  async function loadAccounts(){accounts=await api('/api/accounts');if(!accounts.length)throw Error('No account is linked to this sign-in.');const previous=currentId;currentId=accounts.some(a=>a.id===previous)?previous:accounts[0].id;$('accountSelect').innerHTML=accounts.map(a=>`<option value="${a.id}">${esc(a.label)} · ${esc(a.number)}</option>`).join('');$('accountSelect').value=currentId;renderAccount();}
-  function renderAccount(){const a=accounts.find(x=>x.id===Number(currentId));if(!a)return;$('customerName').textContent=a.name;$('balance').textContent=money(a.balance);$('accountNumber').textContent=a.number;$('accountLabel').textContent=a.label;loadHistory().catch(e=>notice($('notice'),e.message,'error'));}
-  let historyEntries=[];
-  function renderHistory(){const q=$('historySearch').value.trim().toLowerCase(),status=$('historyStatus').value,from=$('historyFrom').value,to=$('historyTo').value,min=$('historyMin').value,max=$('historyMax').value;const filtered=historyEntries.filter(t=>{const searchable=[t.counterparty,t.description,t.requestId].join(' ').toLowerCase(),day=String(t.createdAt||'').slice(0,10),amount=Number(t.amount);return(!q||searchable.includes(q))&&(!status||t.status===status)&&(!from||day>=from)&&(!to||day<=to)&&(!min||amount>=Number(min))&&(!max||amount<=Number(max));});$('transferCount').textContent=`${filtered.length} of ${historyEntries.length} transfers`;if(!historyEntries.length){$('historyBody').className='empty';$('historyBody').textContent='No transfers yet. Your activity will appear here.';return;}if(!filtered.length){$('historyBody').className='empty';$('historyBody').textContent='No transfers match these search and filter settings.';return;}$('historyBody').className='';$('historyBody').innerHTML=`<table class="table"><thead><tr><th>Other account</th><th>Reference</th><th>Status</th><th>Amount</th><th></th></tr></thead><tbody>${filtered.map(t=>`<tr><td><div class="person">${esc(t.counterparty)}</div><div class="sub">${esc(t.description||'Transfer')} · ${date(t.createdAt)}</div></td><td><button class="rowaction" data-detail="${esc(t.requestId)}">${esc(t.requestId)}</button></td><td><span class="pill ${esc(t.status)}">${esc(t.status)}</span></td><td class="money">${t.direction==='outgoing'?'−':'+'}${money(t.amount)}</td><td>${t.status==='Scheduled'?`<button class="cancelaction" data-cancel="${esc(t.requestId)}">Cancel</button>`:''}</td></tr>`).join('')}</tbody></table>`;document.querySelectorAll('[data-detail]').forEach(b=>b.onclick=()=>showDetails(b.dataset.detail));document.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=()=>cancelScheduled(b.dataset.cancel));}
-  async function loadHistory(){historyEntries=await api('/api/transfers');renderHistory();}
-  async function loadAudit(){const events=await api('/api/audit-logs');if(!events.length){$('auditBody').className='empty';$('auditBody').textContent='No audit events yet.';return;}$('auditBody').className='';$('auditBody').innerHTML=`<table class="table"><thead><tr><th>Time</th><th>Event</th><th>Reference</th><th>Details</th></tr></thead><tbody>${events.map(e=>`<tr><td>${date(e.createdAt)}</td><td class="audit-action">${esc(e.action)}</td><td>${esc(e.reference)}</td><td class="audit-details">${esc(e.details)}</td></tr>`).join('')}</tbody></table>`;}
-  let selectedTransferDetails=null;
-  async function showDetails(id){try{const t=await api('/api/transfers/'+encodeURIComponent(id));selectedTransferDetails=t;const extra=t.scheduledFor?`<div class="detail-item"><label>Scheduled for</label><div>${date(t.scheduledFor)}</div></div>`:'';const failure=t.failureReason?`<div class="detail-item"><label>Failure reason</label><div>${esc(t.failureReason)}</div></div>`:'';$('detailsBody').innerHTML=`<div class="details-grid"><div class="detail-item"><label>Description / reminder</label><div>${esc(t.description||'—')}</div></div><div class="detail-item"><label>Amount</label><div>${money(t.amount)}</div></div><div class="detail-item"><label>Recipient</label><div>${esc(t.to)} · ${esc(t.recipientNumber)}</div></div><div class="detail-item"><label>Reference</label><div>${esc(t.requestId)}</div></div><div class="detail-item"><label>Latest status</label><div><span class="pill ${esc(t.status)}">${esc(t.status)}</span></div></div><div class="detail-item"><label>Last checked</label><div>${date(t.checkedAt)}</div></div>${extra}${failure}</div>`;if(!$('detailsDialog').open)$('detailsDialog').showModal();}catch(e){notice($('notice'),e.message,'error');}}
-  function downloadTransferReceipt(t){if(!t)return;const rows=[['Status',t.status],['Amount',money(t.amount)],['Recipient',`${t.to} · ${t.recipientNumber}`],['Description / reminder',t.description||'—'],['Reference',t.requestId],['Date',date(t.createdAt)],...(t.scheduledFor?[['Scheduled for',date(t.scheduledFor)]]:[]),...(t.failureReason?[['Failure reason',t.failureReason]]:[])];const content=`<!doctype html><html lang="en"><meta charset="utf-8"><title>Transfer receipt ${esc(t.requestId)}</title><style>body{font:15px/1.5 system-ui,sans-serif;max-width:680px;margin:40px auto;padding:24px;color:#152923}h1{color:#176b52}.row{display:grid;grid-template-columns:190px 1fr;gap:16px;padding:12px 0;border-bottom:1px solid #e7ece8}.label{color:#718078;font-size:12px;text-transform:uppercase;font-weight:700;letter-spacing:.5px}.value{overflow-wrap:anywhere;font-weight:600}.fine{margin-top:28px;color:#718078;font-size:12px}</style><h1>Northstar Bank</h1><h2>Transfer receipt</h2>${rows.map(([label,value])=>`<div class="row"><div class="label">${esc(label)}</div><div class="value">${esc(value)}</div></div>`).join('')}<p class="fine">Demo receipt · No real money is moved.</p></html>`;const blob=new Blob([content],{type:'text/html;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`transfer-receipt-${String(t.requestId).replace(/[^a-zA-Z0-9_-]/g,'_')}.html`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
-  $('downloadDetailReceipt').onclick=()=>downloadTransferReceipt(selectedTransferDetails);
-  async function cancelScheduled(id){try{const r=await api(`/api/scheduled/${encodeURIComponent(id)}/cancel`,{method:'POST',body:'{}'});notice($('notice'),`Scheduled transfer ${r.requestId} was cancelled.`,'success');await loadAccounts();}catch(e){notice($('notice'),e.message,'error');}}
-  $('loginTab').onclick=()=>showAuth('login');$('registerTab').onclick=()=>showAuth('register');$('forgotButton').onclick=showPasswordChange;$('backToLogin').onclick=()=>showAuth('login');
-  $('authForm').onsubmit=async e=>{e.preventDefault();const button=$('authButton');button.disabled=true;try{const body={email:$('authEmail').value.trim(),password:$('authPassword').value};if(authMode==='register'){body.name=$('authName').value.trim();body.passwordConfirmation=$('authPasswordConfirm').value;}const data=await api('/api/'+(authMode==='login'?'login':'register'),{method:'POST',body:JSON.stringify(body)});csrfToken=data.csrfToken;await openBank(data.user);}catch(err){notice($('authNotice'),err.message,'error');}finally{button.disabled=false;}};
-  $('passwordResetForm').onsubmit=async e=>{e.preventDefault();const button=$('resetButton'),email=$('resetEmail').value.trim();button.disabled=true;try{const data=await api('/api/password/change',{method:'POST',body:JSON.stringify({email,oldPassword:$('oldPassword').value,newPassword:$('newPassword').value,passwordConfirmation:$('newPasswordConfirm').value})});$('oldPassword').value='';$('newPassword').value='';$('newPasswordConfirm').value='';showAuth('login');$('authEmail').value=email;notice($('authNotice'),data.message,'success');}catch(err){notice($('authNotice'),err.message,'error');}finally{button.disabled=false;}};
-  $('logoutButton').onclick=async()=>{try{await api('/api/logout',{method:'POST',body:'{}'});}catch{}csrfToken='';accounts=[];recipients=[];currentId=null;clearForNew();if($('detailsDialog').open)$('detailsDialog').close();showAuth('login');};
-  $('auditToggle').onclick=async()=>{const panel=$('auditPanel');const opening=panel.classList.contains('hidden');panel.classList.toggle('hidden',!opening);$('auditToggle').textContent=opening?'Hide audit log':'Audit log';if(opening){try{await loadAudit();}catch(e){$('auditBody').className='empty';$('auditBody').textContent=e.message;}}};
-  ['historySearch','historyFrom','historyTo','historyMin','historyMax'].forEach(id=>$(id).addEventListener('input',renderHistory));$('historyStatus').addEventListener('change',renderHistory);$('clearHistoryFilters').onclick=()=>{['historySearch','historyStatus','historyFrom','historyTo','historyMin','historyMax'].forEach(id=>$(id).value='');renderHistory();};
-  $('accountSelect').onchange=()=>{currentId=Number($('accountSelect').value);clearForNew();renderAccount();};
-  $('closeDetails').onclick=()=> $('detailsDialog').close();
-  $('detailsDialog').addEventListener('click',e=>{if(e.target===$('detailsDialog'))$('detailsDialog').close();});
-  $('transferMode').onchange=()=>{const scheduled=$('transferMode').value==='scheduled';$('scheduledField').classList.toggle('hidden',!scheduled);$('scheduledFor').required=scheduled;$('noteLabel').textContent=scheduled?'Reminder note':'Description';$('submitButton').textContent=scheduled?'Schedule transfer':'Send transfer';$('transferHint').textContent=scheduled?'We will check your balance and daily limit at the scheduled time. You can cancel before processing.':'A new transfer is held as Pending before it is processed.';setScheduledMinimum();clearForNew();};
-  $('transferForm').onsubmit=async e=>{e.preventDefault();const button=$('submitButton'),scheduled=$('transferMode').value==='scheduled';button.disabled=true;button.textContent=scheduled?'Scheduling…':'Submitting…';try{activeRequestId ||= makeRequestId();$('requestId').textContent=activeRequestId;const body={requestId:activeRequestId,fromAccountId:currentId,toAccountId:Number($('recipient').value),amount:$('amount').value};let endpoint='/api/transfers';if(scheduled){body.scheduledFor=$('scheduledFor').value;body.reminderNote=$('description').value;endpoint='/api/scheduled';}else body.description=$('description').value;lastTransfer=await api(endpoint,{method:'POST',body:JSON.stringify(body)});let actions;if(lastTransfer.status==='Scheduled'){actions=` <button class="rowaction" onclick="showDetails('${esc(lastTransfer.requestId)}')">View details</button> <button class="cancelaction" onclick="cancelScheduled('${esc(lastTransfer.requestId)}')">Cancel scheduled transfer</button> <button class="rowaction" onclick="newTransfer()">New transfer</button>`;}else{actions=` <button class="rowaction" onclick="retrySame()">Retry same request</button> <button class="rowaction" onclick="receipt()">Digital receipt</button> <button class="rowaction" onclick="showDetails('${esc(lastTransfer.requestId)}')">View details</button> <button class="rowaction" onclick="newTransfer()">New transfer</button>`;}notice($('notice'),scheduled?`Transfer scheduled for ${date(lastTransfer.scheduledFor)}. Reminder: ${lastTransfer.description||'none'}. Reference ${lastTransfer.requestId}.`:`Transfer ${lastTransfer.status.toLowerCase()} · ${money(lastTransfer.amount)} to ${lastTransfer.to}. Reference ${lastTransfer.requestId}.`,lastTransfer.status==='Failed'?'error':'success',actions);await Promise.all([loadAccounts(),loadLimits()]);}catch(err){notice($('notice'),err.message,'error');}finally{button.disabled=false;button.textContent=scheduled?'Schedule transfer':'Send transfer';}};
-  async function retrySame(){if(!lastTransfer)return;try{const t=await api('/api/transfers',{method:'POST',body:JSON.stringify({requestId:lastTransfer.requestId,fromAccountId:lastTransfer.fromAccountId,toAccountId:lastTransfer.toAccountId,amount:lastTransfer.amount,description:lastTransfer.description})});notice($('notice'),`Safe retry returned ${t.status}. It uses the same transfer reference.`,t.status==='Failed'?'error':'success');}catch(e){notice($('notice'),e.message,'error');}await Promise.all([loadAccounts(),loadLimits()]);}
-  $('transferMode').dispatchEvent(new Event('change'));
-  function clearForNew(){activeRequestId=null;lastTransfer=null;$('requestId').textContent='Created when you send';hideNotice($('notice'));}
-  function newTransfer(){clearForNew();$('amount').value='';$('description').value='';$('amount').focus();}
-  function receipt(){if(!lastTransfer)return;const t=lastTransfer;const html=`<!doctype html><meta charset="utf-8"><title>Transfer receipt ${esc(t.requestId)}</title><style>body{font:16px system-ui;max-width:620px;margin:50px auto;color:#18372c;padding:20px}h1{color:#176b52}.row{border-bottom:1px solid #ddd;padding:12px 0;display:flex;justify-content:space-between;gap:20px}.fine{color:#777;font-size:13px;margin-top:32px}button{margin-top:20px;padding:10px 16px}</style><h1>Northstar Bank</h1><h2>Transfer receipt</h2><div class="row"><span>Status</span><b>${esc(t.status)}</b></div><div class="row"><span>Amount</span><b>${money(t.amount)}</b></div><div class="row"><span>Recipient</span><b>${esc(t.to)} · ${esc(t.recipientNumber)}</b></div><div class="row"><span>Description</span><b>${esc(t.description||'—')}</b></div><div class="row"><span>Reference</span><b>${esc(t.requestId)}</b></div><div class="row"><span>Date</span><b>${date(t.createdAt)}</b></div><p class="fine">Digital receipt for the Internet Banking Demo. This receipt is for demonstration only.</p><button onclick="print()">Print / Save as PDF</button>`;const w=window.open('','_blank');if(w){w.document.write(html);w.document.close();}else notice($('notice'),'Allow pop-ups to open your digital receipt.','error');}
-  setInterval(async()=>{if(!$('bankView').classList.contains('hidden')){try{await Promise.all([loadAccounts(),loadLimits()]);if(!$('auditPanel').classList.contains('hidden'))await loadAudit();}catch{}}},2000);
-  (async()=>{try{const s=await api('/api/session');if(s.authenticated){csrfToken=s.csrfToken;await openBank(s.user);}else showAuth('login');}catch(e){showAuth('login');notice($('authNotice'),e.message,'error');}})();
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function money(value) { return new Intl.NumberFormat(LOCALES[language], {style:'currency', currency:'KZT', minimumFractionDigits:2, maximumFractionDigits:2}).format(value); }
+  // Use the project's fixed UTC+5 banking day, independently of browser settings.
+  const BANK_TIMEZONE = 'Etc/GMT-5';
+  function date(value) { const d = new Date(value); return Number.isNaN(d.getTime()) ? '—' : new Intl.DateTimeFormat(LOCALES[language], {dateStyle:'medium', timeStyle:'short', timeZone:BANK_TIMEZONE}).format(d) + ' (UTC+5)'; }
+  function localDay(value) { const d = new Date(value); return Number.isNaN(d.getTime()) ? '' : new Date(d.getTime() + 5 * 3600000).toISOString().slice(0, 10); }
+  function statusText(value) { const canonical = String(value || ''); return t('status' + canonical.charAt(0).toUpperCase() + canonical.slice(1).toLowerCase()); }
+  function accountLabel(value) { return value === 'Everyday account' ? t('everydayAccount') : value === 'Savings account' ? t('savingsAccount') : value || t('account'); }
+  const msg = (key, params = {}) => ({key, params});
+  const SYSTEM_KEYS = ['positiveAmount','validAmount','validSchedule','requestLarge','invalidRequest','invalidRequestData','signInRequired','tokenExpired','auditDenied','transferNotFound','notFound','scheduledNotFound','invalidReference','descriptionLong','invalidTransfer','differentRecipient','referenceScheduled','referenceMismatch','scheduleFuture','scheduleYear','reminderLong','invalidScheduled','referenceUsed','enterOldPassword','passwordLength','newPasswordLength','passwordMismatch','newPasswordMismatch','passwordDifferent','invalidPassword','wrongOldPassword','nameLength','enterPassword','invalidDetails','emailExists','wrongPassword','insufficientFunds','unavailableAccount','amountBelow','amountAbove','dailyWouldExceed','insufficientScheduled','passwordChanged','noAccount','sessionExpired','requestFailed'];
+  const SYSTEM_MESSAGES = Object.fromEntries(SYSTEM_KEYS.map(key => [I18N.en[key], key]));
+  SYSTEM_MESSAGES['Transfer reference is already in use'] = 'referenceUsed';
+  SYSTEM_MESSAGES['insufficient funds'] = 'insufficientFunds';
+  function systemText(value) {
+    const text = String(value ?? ''); if (SYSTEM_MESSAGES[text]) return t(SYSTEM_MESSAGES[text]);
+    let match; const amount = raw => money(Number(raw.replaceAll(',', '')));
+    if ((match = text.match(/^Minimum transfer is ([\d,.]+) KZT$/))) return t('minimumTransfer', {amount:amount(match[1])});
+    if ((match = text.match(/^Maximum per transfer is ([\d,.]+) KZT$/))) return t('maximumTransfer', {amount:amount(match[1])});
+    if ((match = text.match(/^Daily transfer limit is ([\d,.]+) KZT\. Remaining today: ([\d,.]+) KZT$/))) return t('dailyExceeded', {limit:amount(match[1]), remaining:amount(match[2])});
+    if ((match = text.match(/^This transfer is already (\w+) and cannot be cancelled$/))) return t('cannotCancel', {status:statusText(match[1])});
+    if (['Failed to fetch','Load failed','NetworkError when attempting to fetch resource.'].includes(text)) return t('networkError');
+    return text || t('requestFailed');
+  }
+  function messageText(message) { if (typeof message === 'function') return messageText(message()); return message?.key ? t(message.key, message.params) : systemText(message); }
+
+  let csrfToken = '', accounts = [], recipients = [], currentId = null, activeRequestId = null, lastTransfer = null, authMode = 'login', limits = {};
+  let historyEntries = [], historyLoaded = false, auditEvents = null, selectedTransferDetails = null, detailRequest = 0, sessionGeneration = 0, refreshing = false;
+  const notices = new Map();
+  function renderNotice(el) {
+    const state = notices.get(el.id); if (!state) return;
+    el.className = 'notice show ' + state.kind; el.textContent = messageText(state.message);
+    for (const action of state.actions) { const button = document.createElement('button'); button.type = 'button'; button.className = action.cancel ? 'cancelaction' : 'rowaction'; button.textContent = t(action.key); button.onclick = action.run; el.append(' ', button); }
+  }
+  function notice(el, message, kind = 'info', actions = []) { notices.set(el.id, {message, kind, actions}); renderNotice(el); }
+  function hideNotice(el) { notices.delete(el.id); el.className = 'notice'; el.textContent = ''; }
+  function reportError(el, error) { if (error.name !== 'AbortError') notice(el, error.message, 'error'); }
+  function staleRequest() { return new DOMException('The session changed', 'AbortError'); }
+  function resetBankState() {
+    sessionGeneration++; detailRequest++; csrfToken = ''; accounts = []; recipients = []; currentId = null; historyEntries = []; historyLoaded = false; auditEvents = null; limits = {}; selectedTransferDetails = null;
+    clearForNew(); $('detailsBody').textContent = ''; $('historyBody').textContent = ''; $('auditBody').textContent = ''; $('accountSelect').textContent = ''; $('recipient').textContent = ''; $('userEmail').textContent = ''; $('customerName').textContent = '—'; $('balance').textContent = '₸—'; $('accountNumber').textContent = '••••'; $('accountLabel').textContent = t('account');
+    if ($('detailsDialog').open) $('detailsDialog').close();
+    document.dispatchEvent(new Event('banksessionchange'));
+  }
+  async function api(url, options = {}) {
+    const generation = sessionGeneration, method = (options.method || 'GET').toUpperCase(), headers = {'Content-Type':'application/json', ...(options.headers || {})};
+    if (method !== 'GET' && csrfToken) headers['X-CSRF-Token'] = csrfToken;
+    let response;
+    try { response = await fetch(url, {...options, credentials:'same-origin', headers}); } catch (error) { if (generation !== sessionGeneration) throw staleRequest(); throw error; }
+    let data = {}; try { data = await response.json(); } catch {}
+    if (generation !== sessionGeneration) throw staleRequest();
+    if (!response.ok) {
+      if (response.status === 401 && !['/api/login','/api/register','/api/password/change'].includes(url)) { resetBankState(); showAuth('login'); notice($('authNotice'), msg('sessionExpired'), 'error'); throw staleRequest(); }
+      throw Error(data.error || I18N.en.requestFailed);
+    }
+    return data;
+  }
+  function renderAuthText() {
+    const changing = authMode === 'password-change', registering = authMode === 'register';
+    $('authTitle').textContent = t(changing ? 'changePassword' : registering ? 'registerTitle' : 'welcome');
+    $('authSubtitle').textContent = t(changing ? 'changePasswordSubtitle' : registering ? 'registerSubtitle' : 'loginSubtitle'); $('authButton').textContent = t(registering ? 'createAccount' : 'signIn');
+  }
+  function showAuth(mode = 'login') {
+    authMode = mode; $('authView').classList.remove('hidden'); $('bankView').classList.add('hidden'); $('userBar').classList.add('hidden'); $('authSwitch').classList.remove('hidden'); $('authForm').classList.remove('hidden'); $('passwordResetForm').classList.add('hidden');
+    $('demoLogin').classList.toggle('hidden', mode !== 'login'); $('forgotButton').classList.toggle('hidden', mode !== 'login'); $('nameField').classList.toggle('hidden', mode !== 'register'); $('confirmField').classList.toggle('hidden', mode !== 'register');
+    $('authName').required = mode === 'register'; $('authPassword').autocomplete = mode === 'login' ? 'current-password' : 'new-password'; $('authPassword').minLength = mode === 'register' ? 12 : 0; $('authPasswordConfirm').required = mode === 'register';
+    $('loginTab').classList.toggle('active', mode === 'login'); $('registerTab').classList.toggle('active', mode === 'register'); document.querySelectorAll('#authForm input').forEach(input => input.setCustomValidity('')); renderAuthText(); hideNotice($('authNotice'));
+  }
+  function showPasswordChange() {
+    authMode = 'password-change'; $('authSwitch').classList.add('hidden'); $('authForm').classList.add('hidden'); $('passwordResetForm').classList.remove('hidden'); $('demoLogin').classList.add('hidden'); $('resetEmail').value = $('authEmail').value.trim(); renderAuthText(); hideNotice($('authNotice'));
+  }
+  function makeRequestId() { const bytes = new Uint8Array(16); crypto.getRandomValues(bytes); return 'TR-' + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('').toUpperCase(); }
+  async function openBank(user) {
+    sessionGeneration++; $('authView').classList.add('hidden'); $('bankView').classList.remove('hidden'); $('userBar').classList.remove('hidden'); $('userEmail').textContent = user.email; $('avatar').textContent = (user.name || '?')[0].toUpperCase(); $('customerName').textContent = user.name;
+    $('auditToggle').classList.toggle('hidden', user.email.toLowerCase() !== 'aruzhan@example.test'); $('auditPanel').classList.add('hidden'); $('auditToggle').textContent = t('auditLog');
+    setScheduledMinimum(); await Promise.all([loadAccounts(), loadRecipients(), loadLimits()]); document.dispatchEvent(new Event('bankready'));
+  }
+  function setScheduledMinimum() { $('scheduledFor').min = new Date(Date.now() + 5 * 3600000 + 60000).toISOString().slice(0, 16); }
+  function renderLimits() { $('limitText').textContent = limits.minimum == null ? t('loadingLimits') : t('limits', {minimum:money(limits.minimum), maximum:money(limits.maximum), daily:money(limits.daily), used:money(limits.usedToday), remaining:money(limits.remainingToday)}); }
+  async function loadLimits() { limits = await api('/api/limits'); $('amount').min = limits.minimum.toFixed(2); $('amount').max = limits.maximum.toFixed(2); renderLimits(); }
+  async function loadRecipients() { recipients = await api('/api/recipients'); renderRecipients(); }
+  function renderRecipients() { const chosen = $('recipient').value; $('recipient').innerHTML = recipients.map(r => `<option value="${r.id}">${esc(r.name)} · ${esc(r.number)}</option>`).join(''); if (recipients.some(r => String(r.id) === chosen)) $('recipient').value = chosen; }
+  async function loadAccounts() { accounts = await api('/api/accounts'); if (!accounts.length) throw Error(I18N.en.noAccount); if (!accounts.some(a => a.id === Number(currentId))) currentId = accounts[0].id; renderAccount(); await loadHistory(); }
+  function renderAccount() {
+    $('accountSelect').innerHTML = accounts.map(a => `<option value="${a.id}">${esc(accountLabel(a.label))} · ${esc(a.number)}</option>`).join(''); $('accountSelect').value = currentId;
+    const account = accounts.find(a => a.id === Number(currentId)); if (!account) return; $('customerName').textContent = account.name; $('balance').textContent = money(account.balance); $('accountNumber').textContent = account.number; $('accountLabel').textContent = accountLabel(account.label);
+  }
+  function renderHistory() {
+    const query = $('historySearch').value.trim().toLocaleLowerCase(LOCALES[language]), status = $('historyStatus').value, from = $('historyFrom').value, to = $('historyTo').value, min = $('historyMin').value, max = $('historyMax').value;
+    const filtered = historyEntries.filter(entry => { const searchable = [entry.counterparty, entry.description, entry.requestId].join(' ').toLocaleLowerCase(LOCALES[language]), day = localDay(entry.createdAt), amount = Number(entry.amount); return (!query || searchable.includes(query)) && (!status || entry.status === status) && (!from || day >= from) && (!to || day <= to) && (!min || amount >= Number(min)) && (!max || amount <= Number(max)); });
+    $('transferCount').textContent = historyLoaded ? t('transferCount', {filtered:filtered.length, total:historyEntries.length}) : t('latestActivity');
+    if (!historyLoaded || !historyEntries.length || !filtered.length) { $('historyBody').className = 'empty'; $('historyBody').textContent = t(!historyLoaded ? 'loadingActivity' : !historyEntries.length ? 'noTransfers' : 'noMatches'); return; }
+    $('historyBody').className = '';
+    $('historyBody').innerHTML = `<table class="table"><thead><tr><th>${esc(t('otherAccount'))}</th><th>${esc(t('reference'))}</th><th>${esc(t('status'))}</th><th>${esc(t('amount'))}</th><th></th></tr></thead><tbody>${filtered.map(entry => `<tr><td><button class="rowaction person" data-detail="${esc(entry.requestId)}">${esc(entry.counterparty)}</button><div class="sub">${esc(entry.description || t('transfer'))} · ${esc(date(entry.createdAt))}</div></td><td><button class="rowaction" data-detail="${esc(entry.requestId)}">${esc(entry.requestId)}</button></td><td><span class="pill ${esc(entry.status)}">${esc(statusText(entry.status))}</span></td><td class="money">${entry.direction === 'outgoing' ? '−' : '+'}${esc(money(entry.amount))}</td><td>${entry.status === 'Scheduled' ? `<button class="cancelaction" data-cancel="${esc(entry.requestId)}">${esc(t('cancel'))}</button>` : ''}</td></tr>`).join('')}</tbody></table>`;
+    document.querySelectorAll('[data-detail]').forEach(button => button.onclick = () => showDetails(button.dataset.detail)); document.querySelectorAll('[data-cancel]').forEach(button => button.onclick = () => cancelScheduled(button.dataset.cancel));
+  }
+  async function loadHistory() {
+    historyEntries = await api('/api/transfers'); historyLoaded = true; renderHistory();
+    if (lastTransfer) lastTransfer = historyEntries.find(entry => entry.requestId === lastTransfer.requestId) || lastTransfer;
+    if (selectedTransferDetails) { selectedTransferDetails = historyEntries.find(entry => entry.requestId === selectedTransferDetails.requestId) || selectedTransferDetails; renderDetails(); }
+    for (const id of notices.keys()) renderNotice($(id));
+  }
+  const AUDIT_ACTIONS = {'Transfer failed':'auditTransferFailed','Transfer completed':'auditTransferCompleted','Scheduled transfer failed':'auditScheduledFailed','Scheduled transfer completed':'auditScheduledCompleted','Transfer details viewed':'auditDetailsViewed','User signed out':'auditSignedOut','Scheduled transfer cancelled':'auditCancelled','Transfer retry received':'auditRetry','Transfer rejected':'auditRejected','Transfer submitted':'auditSubmitted','Scheduled transfer created':'auditScheduledCreated','Password changed':'auditPasswordChanged','Account registered':'auditRegistered','User signed in':'auditSignedIn'};
+  function auditDetails(value) {
+    let match; const text = String(value || ''), amount = raw => money(Number(raw.replaceAll(',', '')));
+    if ((match = text.match(/^([\d,.]+) KZT was not sent: (.+)\.$/))) return t('auditNotSent', {amount:amount(match[1]), reason:systemText(match[2])});
+    if ((match = text.match(/^([\d,.]+) KZT transfer completed\.$/))) return t('auditCompleted', {amount:amount(match[1])});
+    if ((match = text.match(/^([\d,.]+) KZT scheduled transfer completed\.$/))) return t('auditScheduledDone', {amount:amount(match[1])});
+    if ((match = text.match(/^The transfer could not be created: (.+)\.$/))) return t('auditCreationFailed', {reason:systemText(match[1])});
+    if ((match = text.match(/^Viewed transfer details; latest status is (\w+)\.$/))) return t('auditViewed', {status:statusText(match[1])});
+    if ((match = text.match(/^(.+) signed out\.$/))) return t('auditUserOut', {name:match[1]});
+    if ((match = text.match(/^Cancelled scheduled payment for ([\d,.]+) KZT\.$/))) return t('auditCancelAmount', {amount:amount(match[1])});
+    if ((match = text.match(/^Repeated request returned existing (\w+) transfer; no second debit was made\.$/))) return t('auditRetryDetails', {status:statusText(match[1])});
+    if ((match = text.match(/^Rejected ([\d,.]+) KZT amount (below|above) the (minimum|maximum) limit\.$/))) return t(match[2] === 'below' ? 'auditBelow' : 'auditAbove', {amount:amount(match[1])});
+    if ((match = text.match(/^Rejected because the daily limit would be exceeded; ([\d,.]+) KZT remained\.$/))) return t('auditDaily', {amount:amount(match[1])});
+    if ((match = text.match(/^Submitted ([\d,.]+) KZT to (.+); current status is Pending\.$/))) return t('auditSent', {amount:amount(match[1]), name:match[2], status:statusText('Pending')});
+    if ((match = text.match(/^Scheduled ([\d,.]+) KZT for (.+?)\. Reminder: ([\s\S]*)\.$/))) return t('auditScheduled', {amount:amount(match[1]), date:match[2], reminder:match[3] === 'No reminder note' ? t('noReminder') : match[3]});
+    if ((match = text.match(/^(.+) changed the account password\. All active sessions were signed out\.$/))) return t('auditPasswordDetails', {name:match[1]});
+    if ((match = text.match(/^(.+) account registered\.$/))) return t('auditUserRegistered', {name:match[1]});
+    if ((match = text.match(/^(.+) user signed in\.$/))) return t('auditUserIn', {name:match[1]});
+    return text;
+  }
+  function renderAudit() {
+    if (!auditEvents?.length) { $('auditBody').className = 'empty'; $('auditBody').textContent = t(auditEvents ? 'noAudit' : 'selectAudit'); return; }
+    $('auditBody').className = '';
+    $('auditBody').innerHTML = `<table class="table"><thead><tr>${['time','event','reference','details'].map(key => `<th>${esc(t(key))}</th>`).join('')}</tr></thead><tbody>${auditEvents.map(event => `<tr><td>${esc(date(event.createdAt))}</td><td class="audit-action">${esc(AUDIT_ACTIONS[event.action] ? t(AUDIT_ACTIONS[event.action]) : event.action)}</td><td>${esc(event.reference)}</td><td class="audit-details">${esc(auditDetails(event.details))}</td></tr>`).join('')}</tbody></table>`;
+  }
+  async function loadAudit() { auditEvents = await api('/api/audit-logs'); renderAudit(); }
+  function renderDetails() {
+    const transfer = selectedTransferDetails; if (!transfer) return;
+    const rows = [['descriptionReminder', transfer.description || '—'], ['amount', money(transfer.amount)], ['recipient', `${transfer.to} · ${transfer.recipientNumber}`], ['reference', transfer.requestId], ['latestStatus', statusText(transfer.status)], ['lastChecked', date(transfer.checkedAt)]];
+    if (transfer.scheduledFor) rows.push(['scheduledFor', date(transfer.scheduledFor)]); if (transfer.failureReason) rows.push(['failureReason', systemText(transfer.failureReason)]);
+    $('detailsBody').innerHTML = `<div class="details-grid">${rows.map(([key, value]) => `<div class="detail-item"><label>${esc(t(key))}</label><div>${key === 'latestStatus' ? `<span class="pill ${esc(transfer.status)}">${esc(value)}</span>` : esc(value)}</div></div>`).join('')}</div>`;
+  }
+  async function showDetails(id) {
+    const request = ++detailRequest;
+    try { const transfer = await api('/api/transfers/' + encodeURIComponent(id)); if (request !== detailRequest) return; selectedTransferDetails = transfer; renderDetails(); if (!$('detailsDialog').open) $('detailsDialog').showModal(); } catch (error) { reportError($('notice'), error); }
+  }
+  async function freshTransfer(id) {
+    const transfer = await api('/api/transfers/' + encodeURIComponent(id));
+    if (lastTransfer?.requestId === id) lastTransfer = transfer; if (selectedTransferDetails?.requestId === id) { selectedTransferDetails = transfer; renderDetails(); }
+    historyEntries = historyEntries.map(entry => entry.requestId === id ? transfer : entry); renderHistory(); return transfer;
+  }
+  function receiptHtml(transfer) {
+    const rows = [['status',statusText(transfer.status)],['amount',money(transfer.amount)],['recipient',`${transfer.to} · ${transfer.recipientNumber}`],['descriptionReminder',transfer.description || '—'],['reference',transfer.requestId],['date',date(transfer.createdAt)],['lastChecked',date(transfer.checkedAt)]];
+    if (transfer.scheduledFor) rows.push(['scheduledFor',date(transfer.scheduledFor)]); if (transfer.failureReason) rows.push(['failureReason',systemText(transfer.failureReason)]);
+    return `<!doctype html><html lang="${language}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(t('receiptTitle'))} ${esc(transfer.requestId)}</title><style>body{font:15px/1.5 system-ui,sans-serif;max-width:680px;margin:40px auto;padding:24px;color:#152923}h1{color:#176b52}.row{display:grid;grid-template-columns:minmax(100px,190px) 1fr;gap:16px;padding:12px 0;border-bottom:1px solid #e7ece8}.label{color:#718078;font-size:12px;text-transform:uppercase;font-weight:700}.value{overflow-wrap:anywhere;font-weight:600}.fine{margin-top:28px;color:#718078;font-size:12px}button{margin-top:20px;padding:10px 16px}@media print{button{display:none}}</style></head><body><h1>Northstar Bank</h1><h2>${esc(t('receiptTitle'))}</h2>${rows.map(([key,value]) => `<div class="row"><div class="label">${esc(t(key))}</div><div class="value">${esc(value)}</div></div>`).join('')}<p class="fine">${esc(t('receiptNote'))}</p><button onclick="print()">${esc(t('printReceipt'))}</button></body></html>`;
+  }
+  async function downloadTransferReceipt(transfer) {
+    if (!transfer) return; const button = $('downloadDetailReceipt'); button.disabled = true;
+    try { const current = await freshTransfer(transfer.requestId), blob = new Blob([receiptHtml(current)], {type:'text/html;charset=utf-8'}), url = URL.createObjectURL(blob), link = document.createElement('a'); link.href = url; link.download = `transfer-receipt-${String(current.requestId).replace(/[^a-zA-Z0-9_-]/g,'_')}.html`; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); } catch (error) { reportError($('notice'), error); } finally { button.disabled = false; }
+  }
+  async function receipt() {
+    if (!lastTransfer) return; const id = lastTransfer.requestId, popup = window.open('', '_blank');
+    if (!popup) { notice($('notice'), msg('popups'), 'error'); return; }
+    popup.document.body.textContent = t('receiptLoading');
+    try { const current = await freshTransfer(id); if (!popup.closed) { popup.document.open(); popup.document.write(receiptHtml(current)); popup.document.close(); } } catch (error) { popup.close(); reportError($('notice'), error); }
+  }
+  async function cancelScheduled(id) {
+    try { const result = await api(`/api/scheduled/${encodeURIComponent(id)}/cancel`, {method:'POST', body:'{}'}); notice($('notice'), msg('cancelledNotice', {reference:result.requestId}), 'success'); await Promise.all([loadAccounts(), loadLimits()]); } catch (error) { reportError($('notice'), error); }
+  }
+  function renderTransferMode() {
+    const scheduled = $('transferMode').value === 'scheduled'; $('scheduledField').classList.toggle('hidden', !scheduled); $('scheduledFor').required = scheduled;
+    $('noteLabel').textContent = t(scheduled ? 'reminderNote' : 'description'); $('submitButton').textContent = t($('submitButton').disabled ? (scheduled ? 'scheduling' : 'submitting') : (scheduled ? 'scheduleTransfer' : 'sendTransfer')); $('transferHint').textContent = t(scheduled ? 'scheduledHint' : 'pendingHint'); $('requestId').textContent = activeRequestId || t('createdWhenSent');
+  }
+  function transferNotice(transfer) { return transfer.status === 'Scheduled' ? msg('scheduledNotice', {date:date(transfer.scheduledFor), description:transfer.description || t('none'), reference:transfer.requestId}) : msg('transferNotice', {status:statusText(transfer.status), amount:money(transfer.amount), recipient:transfer.to, reference:transfer.requestId}); }
+  function transferActions(transfer) { return [...(transfer.status === 'Scheduled' ? [{key:'cancelSchedule', cancel:true, run:() => cancelScheduled(transfer.requestId)}] : [{key:'retry', run:retrySame}, {key:'digitalReceipt', run:receipt}]), {key:'viewDetails',run:() => showDetails(transfer.requestId)}, {key:'newTransfer',run:newTransfer}]; }
+  async function retrySame() {
+    if (!lastTransfer) return;
+    try { const previous = lastTransfer; lastTransfer = await api('/api/transfers', {method:'POST', body:JSON.stringify({requestId:previous.requestId, fromAccountId:previous.fromAccountId, toAccountId:previous.toAccountId, amount:previous.amount, description:previous.description})}); notice($('notice'), () => msg('retryNotice', {status:statusText(lastTransfer.status)}), lastTransfer.status === 'Failed' ? 'error' : 'success', transferActions(lastTransfer)); await Promise.all([loadAccounts(), loadLimits()]); } catch (error) { reportError($('notice'), error); }
+  }
+  function clearForNew() { activeRequestId = null; lastTransfer = null; $('requestId').textContent = t('createdWhenSent'); hideNotice($('notice')); }
+  function newTransfer() { clearForNew(); $('amount').value = ''; $('description').value = ''; $('amount').focus(); }
+
+  function localizeValidity(input) {
+    input.setCustomValidity(''); const validity = input.validity; let message = '';
+    if (validity.valueMissing) message = t('requiredField'); else if (validity.typeMismatch && input.type === 'email') message = t('validEmail'); else if (validity.tooShort) message = t('tooShort', {min:input.minLength}); else if (validity.tooLong) message = t('tooLong', {max:input.maxLength}); else if (validity.rangeUnderflow) message = t('valueMinimum', {min:input.min}); else if (validity.rangeOverflow) message = t('valueMaximum', {max:input.max}); else if (validity.stepMismatch) message = t('validStep'); else if (!validity.valid) message = t('validValue'); input.setCustomValidity(message);
+  }
+  function applyLanguage() {
+    document.documentElement.lang = language; document.title = t('pageTitle'); $('languageSelect').value = language;
+    document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n)); document.querySelectorAll('[data-i18n-placeholder]').forEach(el => el.placeholder = t(el.dataset.i18nPlaceholder)); document.querySelectorAll('[data-i18n-aria]').forEach(el => el.setAttribute('aria-label', t(el.dataset.i18nAria)));
+    renderAuthText(); renderTransferMode(); renderLimits(); renderAccount(); renderRecipients(); renderHistory(); renderAudit(); renderDetails(); $('auditToggle').textContent = t($('auditPanel').classList.contains('hidden') ? 'auditLog' : 'hideAuditLog');
+    for (const id of notices.keys()) renderNotice($(id)); document.querySelectorAll('input,select,textarea').forEach(input => { if (input.validity.customError) localizeValidity(input); }); document.dispatchEvent(new Event('languagechange'));
+  }
+  function setLanguage(value) { language = Object.hasOwn(I18N, value) ? value : 'en'; try { localStorage.setItem(LANGUAGE_STORAGE_KEY, language); } catch {} applyLanguage(); }
+  $('languageSelect').onchange = event => setLanguage(event.target.value);
+  $('loginTab').onclick = () => showAuth('login'); $('registerTab').onclick = () => showAuth('register'); $('forgotButton').onclick = showPasswordChange; $('backToLogin').onclick = () => showAuth('login');
+  $('authForm').onsubmit = async event => {
+    event.preventDefault(); const button = $('authButton'); button.disabled = true;
+    try { const body = {email:$('authEmail').value.trim(), password:$('authPassword').value}; if (authMode === 'register') { body.name = $('authName').value.trim(); body.passwordConfirmation = $('authPasswordConfirm').value; } const result = await api('/api/' + (authMode === 'login' ? 'login' : 'register'), {method:'POST', body:JSON.stringify(body)}); csrfToken = result.csrfToken; await openBank(result.user); } catch (error) { reportError($('authNotice'), error); } finally { button.disabled = false; }
+  };
+  $('passwordResetForm').onsubmit = async event => {
+    event.preventDefault(); const button = $('resetButton'), email = $('resetEmail').value.trim(); button.disabled = true;
+    try { await api('/api/password/change', {method:'POST', body:JSON.stringify({email, oldPassword:$('oldPassword').value, newPassword:$('newPassword').value, passwordConfirmation:$('newPasswordConfirm').value})}); $('oldPassword').value = ''; $('newPassword').value = ''; $('newPasswordConfirm').value = ''; showAuth('login'); $('authEmail').value = email; notice($('authNotice'), msg('passwordChanged'), 'success'); } catch (error) { reportError($('authNotice'), error); } finally { button.disabled = false; }
+  };
+  $('logoutButton').onclick = async () => { const request = api('/api/logout', {method:'POST', body:'{}'}); resetBankState(); showAuth('login'); $('authButton').disabled = true; try { await request; } catch {} finally { $('authButton').disabled = false; } };
+  $('auditToggle').onclick = async () => { const panel = $('auditPanel'), opening = panel.classList.contains('hidden'); panel.classList.toggle('hidden', !opening); $('auditToggle').textContent = t(opening ? 'hideAuditLog' : 'auditLog'); if (opening) { try { await loadAudit(); } catch (error) { reportError($('notice'), error); } } };
+  ['historySearch','historyFrom','historyTo','historyMin','historyMax'].forEach(id => $(id).addEventListener('input', renderHistory)); $('historyStatus').addEventListener('change', renderHistory);
+  $('clearHistoryFilters').onclick = () => { ['historySearch','historyStatus','historyFrom','historyTo','historyMin','historyMax'].forEach(id => $(id).value = ''); renderHistory(); };
+  $('accountSelect').onchange = () => { currentId = Number($('accountSelect').value); clearForNew(); renderAccount(); };
+  $('closeDetails').onclick = () => $('detailsDialog').close(); $('detailsDialog').addEventListener('close', () => { detailRequest++; selectedTransferDetails = null; });
+  $('detailsDialog').addEventListener('click', event => { if (event.target === $('detailsDialog')) $('detailsDialog').close(); }); $('downloadDetailReceipt').onclick = () => downloadTransferReceipt(selectedTransferDetails);
+  $('transferMode').onchange = () => { renderTransferMode(); setScheduledMinimum(); clearForNew(); $('scheduledFor').setCustomValidity(''); };
+  $('transferForm').onsubmit = async event => {
+    event.preventDefault(); const button = $('submitButton'), scheduled = $('transferMode').value === 'scheduled'; button.disabled = true; renderTransferMode();
+    try { activeRequestId ||= makeRequestId(); $('requestId').textContent = activeRequestId; const body = {requestId:activeRequestId, fromAccountId:currentId, toAccountId:Number($('recipient').value), amount:$('amount').value}; let endpoint = '/api/transfers'; if (scheduled) { body.scheduledFor = $('scheduledFor').value; body.reminderNote = $('description').value; endpoint = '/api/scheduled'; } else body.description = $('description').value; lastTransfer = await api(endpoint, {method:'POST', body:JSON.stringify(body)}); notice($('notice'), () => transferNotice(lastTransfer), lastTransfer.status === 'Failed' ? 'error' : 'success', transferActions(lastTransfer)); await Promise.all([loadAccounts(), loadLimits()]); } catch (error) { reportError($('notice'), error); } finally { button.disabled = false; renderTransferMode(); }
+  };
+  document.querySelectorAll('input,select,textarea').forEach(input => { input.addEventListener('invalid', () => localizeValidity(input)); input.addEventListener('input', () => input.setCustomValidity('')); input.addEventListener('change', () => input.setCustomValidity('')); });
+  setInterval(async () => { if (refreshing || $('bankView').classList.contains('hidden')) return; refreshing = true; try { await Promise.all([loadAccounts(), loadLimits()]); if (!$('auditPanel').classList.contains('hidden')) await loadAudit(); document.dispatchEvent(new Event('bankrefresh')); } catch {} finally { refreshing = false; } }, 2000);
+  applyLanguage(); setScheduledMinimum();
+  (async () => { try { const session = await api('/api/session'); if (session.authenticated) { csrfToken = session.csrfToken; await openBank(session.user); } else showAuth('login'); } catch (error) { if (error.name !== 'AbortError') { showAuth('login'); reportError($('authNotice'), error); } } })();
 </script>
 </body></html>

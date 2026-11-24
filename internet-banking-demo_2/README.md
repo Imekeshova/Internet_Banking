@@ -1,12 +1,12 @@
-# Internet Banking Demo 
+# Internet Banking Demo
 
 A local educational banking demo with customer registration and sign-in, account ownership checks, internal and scheduled transfers, transfer detail views, readable audit events, automated system-check tests, and printable digital receipts. The database and sample accounts remain local to this folder. No real money is moved.
 
-## Team Members & Responsibilities 
+## Team Members & Responsibilities
 
 | Student | Student ID | Role | Key Contribution |
 | :--- | :--- | :--- | :--- |
-| **Imekeshova Malika** | `24B031819` | Systems Analysis & Requirements | End-to-end transfer requirements, `request_id` retry design, status consistency rules (E4) |
+| **Imekeshova Malika** | `24B031819` | Systems Analysis & Requirements | Transfer limits and scheduling requirements, `request_id`/status mapping, RU/KK/EN localization, weekly/monthly transfer statistics and acceptance criteria |
 | **Akhmettayev Alimansur** | `24B030251` | Data & Database | SQLite schema, integer tiyn precision (`1 KZT = 100 tiyn`), `CHECK`/`UNIQUE` constraints & data governance |
 | **Sultanbekuly Yelnur** | `24B032037` | Application & Development | Server implementation (`server.py`), scheduled transfers, audit log, UI (`index.html`), and `PRAGMA foreign_keys=ON` |
 | **Yernazarov Madiyar** | `24B031756` | Architecture & Security | ERD normalization, network firewall & USB control plan, session/CSRF & access isolation |
@@ -18,7 +18,12 @@ A local educational banking demo with customer registration and sign-in, account
 internet-banking-demo_2/
 ├── tests/
 │   ├── __init__.py       # Test package marker
-│   └── test_bank.py      # Automated unit, security, audit & reconciliation tests
+│   ├── test_bank.py      # Core, security, audit & reconciliation tests
+│   ├── test_analytics.py # Period boundaries, aggregation, privacy & migration
+│   ├── test_scheduled.py # Scheduled transfer lifecycle and recovery
+│   └── test_ui.cjs       # Dependency-free localization consistency checks
+├── analytics.js          # Statistics rendering and API refresh
+├── analytics.css         # Statistics cards and responsive layout
 ├── index.html            # Single-page web client interface
 ├── server.py             # Python HTTP server, SQLite database & background worker
 ├── start.bat             # One-click Windows launcher
@@ -78,7 +83,78 @@ Defaults can be changed with environment variables before launching the server:
 * Choose **Schedule for later** to set a future date and time in `UTC+5` and add a reminder note such as *“Send money to Aigul for utility bills.”* Scheduled transfers appear in **Recent Activity** and can be cancelled while their status is `Scheduled`. At the scheduled time, the server checks the current balance, amount limits, and that day’s remaining limit. It executes the transfer only if all checks pass; otherwise, it marks the schedule `Failed` and records the reason. Scheduled entries resume after a server restart.
 * The **Audit Log** button appears only when signed in as `aruzhan@example.test`. Clicking it opens the log; clicking it again hides the log. The server also rejects audit-log requests from every other account. The log lists readable records for sign-in, sign-out, transfer submission, retries, transfer completion or failure, scheduled-transfer creation or cancellation, transfer detail views, and rejected transfer-limit attempts.
 
-## Automated Testing (`tests/test_bank.py`)
+## Languages and Transfer Statistics
+
+The language selector is available before and after sign-in. English (`en`), Russian (`ru`), and Kazakh (`kk`) cover the main forms, transfer statuses, errors, history, details and receipts. The choice is saved in the current browser. Names and notes entered by users are kept as written. Currency remains KZT; displayed operation times and scheduling use UTC+5.
+
+The dashboard shows two separate totals across all accounts owned by the signed-in customer:
+
+* **This week:** successful outgoing amount and count since Monday 00:00, UTC+5.
+* **This month:** successful outgoing amount and count since the first day of the month, 00:00, UTC+5.
+
+Monthly highlights show the **largest individual transfer**, **smallest individual transfer** (amount, recipient and time), and **most frequent recipients by number of transfers**. If recipients share the highest count, all are shown. Transfers to different accounts of the same recipient are grouped together. Equal largest/smallest amounts choose the earliest completed transfer, then reference, for a stable result.
+
+Only outgoing `Completed` ledger entries count. Incoming, `Pending`, `Failed`, `Scheduled` and `Cancelled` entries do not. A scheduled transfer enters the statistics once, after successful execution. Empty totals are zero; missing highlights show a translated empty state. The initial successful demo transfer is included when it falls in the period.
+
+Statistics come from authenticated `GET /api/analytics`, over the complete ledger, independently of the history panel's latest-50 limit and its filters. The response contains `currency`, `timeZone`, `asOf`, `week` and `month`. Both periods contain inclusive `start`, exclusive `end`, `totalAmount` (KZT) and `count`. `month` also contains `largest`, `smallest` and `frequentRecipients`. No completion after `asOf` is counted.
+
+### Completion Dates and Existing Data
+
+New successful transfers save an immutable `completed_at` in the same transaction as the balance changes. Viewing a finished transfer does not change its recorded decision time. The database upgrade preserves balances and history.
+
+For older completed records, migration uses an available successful audit event or the matching completed schedule's timestamp; otherwise it uses the original creation time. Older versions overwrote `checked_at` when details were opened, so it cannot reliably recover historical completion time. The creation-time fallback can affect classification of an old transfer near a week/month boundary. New transfers have an exact completion time.
+
+### Requirements and Acceptance Criteria
+
+| ID | Rule | How to accept it |
+| --- | --- | --- |
+| LANG-01 | Three languages on the same application | Switch EN → RU → KK on sign-in and in the dashboard; labels, statuses, errors and receipts use the chosen language. |
+| LANG-02 | Language persists without losing form data | Switch with a partially filled form; values remain. Refresh; the selected language remains. |
+| STAT-01 | Week and month are separate calendar periods in UTC+5 | A successful transfer before Monday but within this month increases only the monthly total. Test Sunday/Monday, month and year boundaries. |
+| STAT-02 | Only successful outgoing transfers count | Compare totals with the ledger including incoming, pending, failed and cancelled examples; none of those increases the totals. |
+| STAT-03 | Correct sums and counts | Two successful transfers of 1,000 and 2,000 KZT in both periods give 3,000 KZT and count 2 in each. |
+| STAT-04 | Monthly extrema are individual transfers | In that example, smallest is 1,000 KZT and largest is 2,000 KZT, with their recipient and date. |
+| STAT-05 | Frequency means number, not money | Three transfers to A beat two transfers to B even if B received more money. Equal highest counts show all tied recipients. |
+| STAT-06 | Statistics are complete and private | More than 50 matching transfers all count; a second customer cannot see the first customer's totals. |
+| STAT-07 | Scheduled success counts once | Create a schedule: no change. Execute: amount/count increase once. Execute the worker again: no extra increase. |
+| STAT-08 | Reading does not rewrite completion time | Open a completed transfer repeatedly; its completion time and statistics stay unchanged. |
+| SCH-01 | Scheduling reserves neither balance nor daily allowance | After creation, balances and used daily limit remain unchanged. |
+| SCH-02 | Execution rechecks current conditions | Reduce funds or exhaust the daily limit after scheduling; execution fails with a reason and no balance changes. |
+| SCH-03 | Only the owner can cancel a Scheduled entry | Owner cancellation succeeds before processing; foreign and already-final requests cannot cancel it. |
+| SCH-04 | Restart resumes persisted work | Pending transfers and Scheduled entries are rescheduled; terminal entries are not sent again. |
+| UI-01 | Layout works on desktop and phone | Cards, forms and actions remain readable at desktop and 390px phone width in all languages. |
+
+### Field Mapping: Form → API → Database
+
+| Meaning / form | API JSON | Database | Rule |
+| --- | --- | --- | --- |
+| Transfer reference | `requestId` | `request_id` | New requests use `TR-` + 32 uppercase hexadecimal characters. The same reference links a completed schedule to its ledger entry. |
+| Selected sender account | `fromAccountId` | `sender_account_id` | Must belong to the signed-in user. |
+| Recipient account | `toAccountId` | `recipient_account_id` | Must exist and differ from the sender account. |
+| Amount entered in KZT | `amount` | `amount_cents` | Stored as integer tiyn: 100.50 KZT → 10050. No currency exchange. |
+| Ordinary transfer description | `description` | `transfers.description` | Optional, up to 200 characters. |
+| Scheduled reminder note | POST `reminderNote`; response `description` | `scheduled_transfers.reminder_note` | Copied to the successful ledger entry's description; it is a note, not a notification. |
+| Scheduled date/time | `scheduledFor` | `scheduled_for` | Input without an offset means UTC+5; stored timestamps include a timezone. Minimum 30 seconds ahead, maximum 365 days. |
+| Created | `createdAt` | `created_at` | Creation of the record; for a successful schedule's ledger entry, its execution time. |
+| Last checked/decision | `checkedAt` | `checked_at`, or schedule `updated_at` | Pending lookups may refresh it; terminal lookups preserve it. |
+| Successful completion | `completedAt` | `transfers.completed_at` | Immutable completion timestamp used for statistics; null until successful. Historical fallback described above. |
+| Operation state | `status` | `status` | Canonical English values remain unchanged in API/DB; only displayed labels are translated. |
+| Failure explanation | `failureReason` | `failure_reason` | Displayed in the selected language for known system reasons; no balance change on failure. |
+
+Ordinary status flow: `Pending → Completed / Failed`. Schedule flow: `Scheduled → Completed / Failed / Cancelled`.
+
+Ordinary retries with the same reference and identical fields return the existing transfer (`200`); changed fields return `409`. Scheduled creation currently rejects any reused reference (`409`), including an identical payload. Retrying a worker never moves money twice. These are intentionally documented as different API contracts.
+
+### Implementation Decisions and Assumptions
+
+* Keep the existing Python/SQLite and single-page client for a small local coursework demo; no new service or framework is required. Translation dictionaries stay beside the interface for the team to maintain.
+* Use server-side aggregation instead of adding up visible history rows, so the latest-50 display limit cannot truncate statistics. Integer-tiyn aggregation preserves monetary precision.
+* Use calendar weeks/months in UTC+5 rather than rolling 7/30-day windows, matching the agreed separate week/month totals. Highlights remain monthly.
+* Rank recipients by count rather than total amount, matching the revised requirement. Keep every tied leader rather than arbitrarily hiding one.
+* Refresh statistics with account activity. Keep the last valid result on a temporary network failure and show a translated refresh error; never substitute an error with a zero total. User data is cleared on sign-out.
+* Preserve existing balances/history and run automated checks only against temporary databases. New database fields are added through repeatable migration.
+
+## Automated Testing
 
 The project includes an automated test suite that runs against an isolated temporary SQLite database without touching `banking.sqlite3`.
 
@@ -87,29 +163,39 @@ The project includes an automated test suite that runs against an isolated tempo
 From `internet-banking-demo_2`:
 
 ```powershell
-python -m unittest tests.test_bank -v
+python -m unittest discover -v
+```
+
+With Node.js installed, also check translation coverage, interpolation parameters, canonical status filter values and JavaScript syntax:
+
+```powershell
+node --test tests/test_ui.cjs
 ```
 
 ### Covered Verification Areas
 
 * **Transfer Lifecycle & Atomicity (`test_01` – `test_04`):** `Pending` creation, atomic debit/credit to `Completed`, rollback on insufficient funds (`Failed`), and self-transfer rejection.
 * **Idempotency & Request Reference Control (`test_05` – `test_08`):** Strict `TR-<32 hex>` format validation, duplicate retry protection (`200 OK` without double debit), and payload mismatch rejection (`409 Conflict`).
-* **Security, Sessions & Access Isolation (`test_09` – `test_12`):** Salted `PBKDF2-HMAC-SHA256` password hashing, unauthenticated rejection (`401`), CSRF enforcement (`403`), and IDOR protection across user accounts and audit logs.
+* **Security, Sessions & Access Isolation (`test_09` – `test_12`, `test_24`):** Salted `PBKDF2-HMAC-SHA256` password hashing, unauthenticated rejection (`401`), CSRF enforcement (`403`), IDOR protection across user accounts, and access checks on the actual audit-log endpoint.
 * **Limits & Data-Quality Audit (`test_13` – `test_16`):** Min/max boundary checks (`100` – `1,000,000 KZT`), daily `UTC+5` limit calculation, invalid amount rejection (`E3 Validity`), and 5-minute stale `Pending` detection (`E5 Timeliness`).
 * **Database Integrity & Reconciliation (`test_17` – `test_23`):** Foreign key enforcement, `CHECK` constraints, pending recovery after restart, ledger balance conservation, `/api/next-id` format verification, and recipient privacy masking.
+* **Analytics (`test_analytics.py`):** calendar boundaries, exact totals and extrema, recipient frequency/ties, user isolation, history beyond 50 entries, immutable completion time and non-destructive migration.
+* **Scheduled transfers (`test_scheduled.py`):** deferred debit, cancellation, execution-time checks, retry safety and restart recovery.
 
-## Security, Privacy & Ethics Compliance 
+Verified on 24 November 2026: **56 Python tests and 6 JavaScript localization checks passed**, with no expected failures. Browser checks covered switching and remembering all three languages, preserving form input, desktop/390px layouts, successful transfers updating statistics, a failed transfer keeping statistics unchanged and showing an error, scheduled cancellation, and hidden fields not blocking unrelated forms. Browser checks used a separate temporary demo database, not the user's saved balances.
+
+## Security, Privacy & Ethics Compliance
 
 | Dimension | Implemented Control | Verification / Evidence |
 | --- | --- | --- |
 | **Threats (Credentials & Sessions)** | Salted `PBKDF2-HMAC-SHA256` password hashing, `HttpOnly; SameSite=Strict` cookies, and mandatory `X-CSRF-Token` validation. | `test_09`, `test_10`, `test_11` |
-| **Threats (Access Control / IDOR)** | Server-side ownership checks on accounts, transfers, and restricted access to the system **Audit Log**. | `test_12` |
+| **Threats (Access Control / IDOR)** | Server-side ownership checks on accounts, transfers, and restricted access to the system **Audit Log**. | `test_12`, `test_24` |
 | **Threats (Physical Terminal)** | Branch terminal architecture specifies a `PCI-PTS` encrypted PIN pad and strict USB device whitelisting. | Hardware & Security Plan (Lab 5–6) |
 | **Privacy (Data Minimization)** | Recipient lists display only masked account numbers (`KZ•• 1042`) without exposing full account details or balances. | `GET /api/recipients`, `test_23` |
 | **Ethics (Financial Accuracy)** | All amounts are stored and processed in integer tiyns (`1 KZT = 100 tiyn`) with `CHECK(balance_cents >= 0)` to prevent rounding or overdraft errors. | `test_15`, `test_17`, `test_20` |
 | **Ethics (Transparency & Fault Resilience)** | Idempotent `request_id` prevents accidental double charges; stale `Pending` records (`> 5 min`) are flagged under Rule E5; digital receipts remain printable/exportable. | `test_06`, `test_16` |
 
-## Emerging Technologies in IS 
+## Emerging Technologies in IS
 
 The demo is intentionally a small, local system. The table below shows how current emerging technologies relate to it. Items marked **Implemented** exist in this repository; items marked **Proposed** are design ideas for a production version and are not part of the code.
 
@@ -122,7 +208,7 @@ The demo is intentionally a small, local system. The table below shows how curre
 | **AI-assisted fraud detection** | Flag unusual amounts, frequency or recipients using the audit log as input | Proposed |
 | **Open banking APIs** | Controlled third-party access to account data with customer consent | Proposed |
 
-## Business/IT Strategy: Planning & Implementation 
+## Business/IT Strategy: Planning & Implementation
 
 Suggested rollout path if this demo were evolved into a real service:
 
@@ -155,8 +241,10 @@ AI tools were used as an assistant for drafting code and documentation. All gene
 4. Send an amount above the balance to show `Failed` without balance change.
 5. Schedule a transfer for later and cancel it.
 6. Open the **Audit Log** (Aruzhan only) and show that other accounts are rejected.
-7. Run `python -m unittest tests.test_bank -v` and show all tests passing.
-8. Present the terminal plan (PCI-PTS PIN pad, USB control) and the TCO analysis.
+7. Switch EN → RU → KK and refresh to show that the language is remembered.
+8. Compare the week/month totals and monthly largest/smallest/frequent-recipient cards with successful outgoing transfers. Remember the seeded 10,000 KZT transfer.
+9. Run `python -m unittest discover -v` and show the results.
+10. Present the terminal plan (PCI-PTS PIN pad, USB control) and the TCO analysis.
 
 ## Demo Scope
 

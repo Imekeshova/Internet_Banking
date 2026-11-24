@@ -1,5 +1,5 @@
 """
-Internet Banking Demo - 20 automated system-check tests (+1 known-bug test).
+Internet Banking Demo - 25 automated core system-check tests.
 
 Run from the project folder:   python -m unittest tests.test_bank -v
 (or)                           python tests/test_bank.py

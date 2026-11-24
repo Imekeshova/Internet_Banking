@@ -731,8 +731,10 @@
   const notices = new Map();
   function renderNotice(el) {
     const state = notices.get(el.id); if (!state) return;
-    el.className = 'notice show ' + state.kind; el.textContent = messageText(state.message);
-    for (const action of state.actions) { const button = document.createElement('button'); button.type = 'button'; button.className = action.cancel ? 'cancelaction' : 'rowaction'; button.textContent = t(action.key); button.onclick = action.run; el.append(' ', button); }
+    const kind = typeof state.kind === 'function' ? state.kind() : state.kind;
+    const actions = typeof state.actions === 'function' ? state.actions() : state.actions;
+    el.className = 'notice show ' + kind; el.textContent = messageText(state.message);
+    for (const action of actions) { const button = document.createElement('button'); button.type = 'button'; button.className = action.cancel ? 'cancelaction' : 'rowaction'; button.textContent = t(action.key); button.onclick = action.run; el.append(' ', button); }
   }
   function notice(el, message, kind = 'info', actions = []) { notices.set(el.id, {message, kind, actions}); renderNotice(el); }
   function hideNotice(el) { notices.delete(el.id); el.className = 'notice'; el.textContent = ''; }
@@ -765,7 +767,7 @@
   function showAuth(mode = 'login') {
     authMode = mode; $('authView').classList.remove('hidden'); $('bankView').classList.add('hidden'); $('userBar').classList.add('hidden'); $('authSwitch').classList.remove('hidden'); $('authForm').classList.remove('hidden'); $('passwordResetForm').classList.add('hidden');
     $('demoLogin').classList.toggle('hidden', mode !== 'login'); $('forgotButton').classList.toggle('hidden', mode !== 'login'); $('nameField').classList.toggle('hidden', mode !== 'register'); $('confirmField').classList.toggle('hidden', mode !== 'register');
-    $('authName').required = mode === 'register'; $('authPassword').autocomplete = mode === 'login' ? 'current-password' : 'new-password'; $('authPassword').minLength = mode === 'register' ? 12 : 0; $('authPasswordConfirm').required = mode === 'register';
+    $('authName').required = mode === 'register'; $('authName').disabled = mode !== 'register'; $('authPassword').autocomplete = mode === 'login' ? 'current-password' : 'new-password'; $('authPassword').minLength = mode === 'register' ? 12 : 0; $('authPasswordConfirm').required = mode === 'register';
     $('loginTab').classList.toggle('active', mode === 'login'); $('registerTab').classList.toggle('active', mode === 'register'); document.querySelectorAll('#authForm input').forEach(input => input.setCustomValidity('')); renderAuthText(); hideNotice($('authNotice'));
   }
   function showPasswordChange() {
@@ -862,14 +864,22 @@
     try { const result = await api(`/api/scheduled/${encodeURIComponent(id)}/cancel`, {method:'POST', body:'{}'}); notice($('notice'), msg('cancelledNotice', {reference:result.requestId}), 'success'); await Promise.all([loadAccounts(), loadLimits()]); } catch (error) { reportError($('notice'), error); }
   }
   function renderTransferMode() {
-    const scheduled = $('transferMode').value === 'scheduled'; $('scheduledField').classList.toggle('hidden', !scheduled); $('scheduledFor').required = scheduled;
+    const scheduled = $('transferMode').value === 'scheduled'; $('scheduledField').classList.toggle('hidden', !scheduled); $('scheduledFor').required = scheduled; $('scheduledFor').disabled = !scheduled;
     $('noteLabel').textContent = t(scheduled ? 'reminderNote' : 'description'); $('submitButton').textContent = t($('submitButton').disabled ? (scheduled ? 'scheduling' : 'submitting') : (scheduled ? 'scheduleTransfer' : 'sendTransfer')); $('transferHint').textContent = t(scheduled ? 'scheduledHint' : 'pendingHint'); $('requestId').textContent = activeRequestId || t('createdWhenSent');
   }
   function transferNotice(transfer) { return transfer.status === 'Scheduled' ? msg('scheduledNotice', {date:date(transfer.scheduledFor), description:transfer.description || t('none'), reference:transfer.requestId}) : msg('transferNotice', {status:statusText(transfer.status), amount:money(transfer.amount), recipient:transfer.to, reference:transfer.requestId}); }
-  function transferActions(transfer) { return [...(transfer.status === 'Scheduled' ? [{key:'cancelSchedule', cancel:true, run:() => cancelScheduled(transfer.requestId)}] : [{key:'retry', run:retrySame}, {key:'digitalReceipt', run:receipt}]), {key:'viewDetails',run:() => showDetails(transfer.requestId)}, {key:'newTransfer',run:newTransfer}]; }
+  function transferNoticeKind(transfer) { return transfer?.status === 'Failed' ? 'error' : transfer?.status === 'Completed' ? 'success' : 'info'; }
+  function transferActions(transfer) {
+    if (!transfer) return [];
+    const actions = [];
+    if (transfer.status === 'Scheduled') actions.push({key:'cancelSchedule', cancel:true, run:() => cancelScheduled(transfer.requestId)});
+    else if (!transfer.scheduledFor && ['Pending','Completed','Failed'].includes(transfer.status)) actions.push({key:'retry', run:retrySame});
+    actions.push({key:'digitalReceipt', run:receipt}, {key:'viewDetails', run:() => showDetails(transfer.requestId)}, {key:'newTransfer', run:newTransfer});
+    return actions;
+  }
   async function retrySame() {
-    if (!lastTransfer) return;
-    try { const previous = lastTransfer; lastTransfer = await api('/api/transfers', {method:'POST', body:JSON.stringify({requestId:previous.requestId, fromAccountId:previous.fromAccountId, toAccountId:previous.toAccountId, amount:previous.amount, description:previous.description})}); notice($('notice'), () => msg('retryNotice', {status:statusText(lastTransfer.status)}), lastTransfer.status === 'Failed' ? 'error' : 'success', transferActions(lastTransfer)); await Promise.all([loadAccounts(), loadLimits()]); } catch (error) { reportError($('notice'), error); }
+    if (!lastTransfer || lastTransfer.scheduledFor) return;
+    try { const previous = lastTransfer; lastTransfer = await api('/api/transfers', {method:'POST', body:JSON.stringify({requestId:previous.requestId, fromAccountId:previous.fromAccountId, toAccountId:previous.toAccountId, amount:previous.amount, description:previous.description})}); notice($('notice'), () => msg('retryNotice', {status:statusText(lastTransfer.status)}), () => transferNoticeKind(lastTransfer), () => transferActions(lastTransfer)); await Promise.all([loadAccounts(), loadLimits()]); } catch (error) { reportError($('notice'), error); }
   }
   function clearForNew() { activeRequestId = null; lastTransfer = null; $('requestId').textContent = t('createdWhenSent'); hideNotice($('notice')); }
   function newTransfer() { clearForNew(); $('amount').value = ''; $('description').value = ''; $('amount').focus(); }
@@ -905,7 +915,7 @@
   $('transferMode').onchange = () => { renderTransferMode(); setScheduledMinimum(); clearForNew(); $('scheduledFor').setCustomValidity(''); };
   $('transferForm').onsubmit = async event => {
     event.preventDefault(); const button = $('submitButton'), scheduled = $('transferMode').value === 'scheduled'; button.disabled = true; renderTransferMode();
-    try { activeRequestId ||= makeRequestId(); $('requestId').textContent = activeRequestId; const body = {requestId:activeRequestId, fromAccountId:currentId, toAccountId:Number($('recipient').value), amount:$('amount').value}; let endpoint = '/api/transfers'; if (scheduled) { body.scheduledFor = $('scheduledFor').value; body.reminderNote = $('description').value; endpoint = '/api/scheduled'; } else body.description = $('description').value; lastTransfer = await api(endpoint, {method:'POST', body:JSON.stringify(body)}); notice($('notice'), () => transferNotice(lastTransfer), lastTransfer.status === 'Failed' ? 'error' : 'success', transferActions(lastTransfer)); await Promise.all([loadAccounts(), loadLimits()]); } catch (error) { reportError($('notice'), error); } finally { button.disabled = false; renderTransferMode(); }
+    try { activeRequestId ||= makeRequestId(); $('requestId').textContent = activeRequestId; const body = {requestId:activeRequestId, fromAccountId:currentId, toAccountId:Number($('recipient').value), amount:$('amount').value}; let endpoint = '/api/transfers'; if (scheduled) { body.scheduledFor = $('scheduledFor').value; body.reminderNote = $('description').value; endpoint = '/api/scheduled'; } else body.description = $('description').value; lastTransfer = await api(endpoint, {method:'POST', body:JSON.stringify(body)}); notice($('notice'), () => transferNotice(lastTransfer), () => transferNoticeKind(lastTransfer), () => transferActions(lastTransfer)); await Promise.all([loadAccounts(), loadLimits()]); } catch (error) { reportError($('notice'), error); } finally { button.disabled = false; renderTransferMode(); }
   };
   document.querySelectorAll('input,select,textarea').forEach(input => { input.addEventListener('invalid', () => localizeValidity(input)); input.addEventListener('input', () => input.setCustomValidity('')); input.addEventListener('change', () => input.setCustomValidity('')); });
   setInterval(async () => { if (refreshing || $('bankView').classList.contains('hidden')) return; refreshing = true; try { await Promise.all([loadAccounts(), loadLimits()]); if (!$('auditPanel').classList.contains('hidden')) await loadAudit(); document.dispatchEvent(new Event('bankrefresh')); } catch {} finally { refreshing = false; } }, 2000);

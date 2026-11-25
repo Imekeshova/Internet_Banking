@@ -20,8 +20,10 @@ internet-banking-demo_2/
 │   ├── __init__.py       # Test package marker
 │   ├── test_bank.py      # Core, security, audit & reconciliation tests
 │   ├── test_analytics.py # Period boundaries, aggregation, privacy & migration
+│   ├── test_limits.py    # Invalid inputs and UTC+5 daily-limit boundaries
 │   ├── test_scheduled.py # Scheduled transfer lifecycle and recovery
-│   └── test_ui.cjs       # Dependency-free localization consistency checks
+│   ├── test_ui.cjs       # Localization and form behavior checks
+│   └── test_analytics_ui.cjs # Async statistics and keyboard-focus regressions
 ├── analytics.js          # Statistics rendering and API refresh
 ├── analytics.css         # Statistics cards and responsive layout
 ├── index.html            # Single-page web client interface
@@ -85,7 +87,7 @@ Defaults can be changed with environment variables before launching the server:
 
 ## Languages and Transfer Statistics
 
-The language selector is available before and after sign-in. English (`en`), Russian (`ru`), and Kazakh (`kk`) cover the main forms, transfer statuses, errors, history, details and receipts. The choice is saved in the current browser. Names and notes entered by users are kept as written. Currency remains KZT; displayed operation times and scheduling use UTC+5.
+The EN / RU / KK buttons switch languages in one click before and after sign-in. English (`en`), Russian (`ru`), and Kazakh (`kk`) cover the main forms, transfer statuses, errors, history, details and receipts. The choice is saved in the current browser. Names and notes entered by users are kept as written. Currency remains KZT; displayed operation times and scheduling use UTC+5. Kazakh month names have an explicit fallback for browsers with incomplete locale data.
 
 The dashboard shows two separate totals across all accounts owned by the signed-in customer:
 
@@ -110,6 +112,9 @@ For older completed records, migration uses an available successful audit event 
 | --- | --- | --- |
 | LANG-01 | Three languages on the same application | Switch EN → RU → KK on sign-in and in the dashboard; labels, statuses, errors and receipts use the chosen language. |
 | LANG-02 | Language persists without losing form data | Switch with a partially filled form; values remain. Refresh; the selected language remains. |
+| LANG-03 | Dates stay readable and use UTC+5 in every language | Check operation dates, the statistics month and scheduled audit details in EN/RU/KK, including midnight and year rollover; Kazakh months must not appear as `M11`. |
+| LIM-01 | Amount boundaries and daily allowance are enforced by the server | With default settings, reject below 100 KZT and above 1,000,000 KZT; include Pending and Completed requests created in the current UTC+5 day toward 2,000,000 KZT across the customer's accounts. Failed requests do not consume allowance. |
+| LIM-02 | Invalid inputs never select an unintended account or crash a handler | Both transfer endpoints return 400 for fractional/boolean/out-of-range account IDs and oversized/nonfinite amounts, without creating a transfer or timer. Integer IDs and integer strings remain accepted. |
 | STAT-01 | Week and month are separate calendar periods in UTC+5 | A successful transfer before Monday but within this month increases only the monthly total. Test Sunday/Monday, month and year boundaries. |
 | STAT-02 | Only successful outgoing transfers count | Compare totals with the ledger including incoming, pending, failed and cancelled examples; none of those increases the totals. |
 | STAT-03 | Correct sums and counts | Two successful transfers of 1,000 and 2,000 KZT in both periods give 3,000 KZT and count 2 in each. |
@@ -118,19 +123,23 @@ For older completed records, migration uses an available successful audit event 
 | STAT-06 | Statistics are complete and private | More than 50 matching transfers all count; a second customer cannot see the first customer's totals. |
 | STAT-07 | Scheduled success counts once | Create a schedule: no change. Execute: amount/count increase once. Execute the worker again: no extra increase. |
 | STAT-08 | Reading does not rewrite completion time | Open a completed transfer repeatedly; its completion time and statistics stay unchanged. |
+| STAT-09 | Refresh failures and session changes preserve correctness | A network error retains the last successful figures with a warning; sign-out clears them, and a late response from the previous session cannot restore them. |
 | SCH-01 | Scheduling reserves neither balance nor daily allowance | After creation, balances and used daily limit remain unchanged. |
 | SCH-02 | Execution rechecks current conditions | Reduce funds or exhaust the daily limit after scheduling; execution fails with a reason and no balance changes. |
 | SCH-03 | Only the owner can cancel a Scheduled entry | Owner cancellation succeeds before processing; foreign and already-final requests cannot cancel it. |
 | SCH-04 | Restart resumes persisted work | Pending transfers and Scheduled entries are rescheduled; terminal entries are not sent again. |
+| SCH-05 | Scheduling respects its exact time boundaries | Reject less than 30 seconds or more than 365 days ahead. Round the form's earliest selectable minute upward and preserve fractional seconds submitted through the API. Invalid timezone/date overflow returns 400. |
 | UI-01 | Layout works on desktop and phone | Cards, forms and actions remain readable at desktop and 390px phone width in all languages. |
+| UI-02 | Statistics refresh preserves keyboard position | Focus the smallest-transfer detail button when smallest and largest are the same transfer; refreshing or changing language keeps focus on that same button. |
+| UI-03 | Background polling keeps unchanged actions usable | Focus Cancel in a scheduled-transfer notice or a history row; polling keeps the existing button. A translated notice restores focus to the same action. |
 
 ### Field Mapping: Form → API → Database
 
 | Meaning / form | API JSON | Database | Rule |
 | --- | --- | --- | --- |
 | Transfer reference | `requestId` | `request_id` | New requests use `TR-` + 32 uppercase hexadecimal characters. The same reference links a completed schedule to its ledger entry. |
-| Selected sender account | `fromAccountId` | `sender_account_id` | Must belong to the signed-in user. |
-| Recipient account | `toAccountId` | `recipient_account_id` | Must exist and differ from the sender account. |
+| Selected sender account | `fromAccountId` | `sender_account_id` | Positive integer ID in SQLite's signed 64-bit range; must belong to the signed-in user. No boolean or fractional coercion. |
+| Recipient account | `toAccountId` | `recipient_account_id` | Same ID validation; must exist and differ from the sender account. |
 | Amount entered in KZT | `amount` | `amount_cents` | Stored as integer tiyn: 100.50 KZT → 10050. No currency exchange. |
 | Ordinary transfer description | `description` | `transfers.description` | Optional, up to 200 characters. |
 | Scheduled reminder note | POST `reminderNote`; response `description` | `scheduled_transfers.reminder_note` | Copied to the successful ledger entry's description; it is a note, not a notification. |
@@ -166,10 +175,10 @@ From `internet-banking-demo_2`:
 python -m unittest discover -v
 ```
 
-With Node.js installed, also check translation coverage, interpolation parameters, canonical status filter values and JavaScript syntax:
+With Node.js installed, run the dependency-free JavaScript checks for translation coverage, form behavior, async statistics, keyboard focus and syntax:
 
 ```powershell
-node --test tests/test_ui.cjs
+node --test tests/test_ui.cjs tests/test_analytics_ui.cjs
 ```
 
 ### Covered Verification Areas
@@ -181,8 +190,10 @@ node --test tests/test_ui.cjs
 * **Database Integrity & Reconciliation (`test_17` – `test_23`):** Foreign key enforcement, `CHECK` constraints, pending recovery after restart, ledger balance conservation, `/api/next-id` format verification, and recipient privacy masking.
 * **Analytics (`test_analytics.py`):** calendar boundaries, exact totals and extrema, recipient frequency/ties, user isolation, history beyond 50 entries, immutable completion time and non-destructive migration.
 * **Scheduled transfers (`test_scheduled.py`):** deferred debit, cancellation, execution-time checks, retry safety and restart recovery.
+* **Input boundaries (`test_limits.py`):** strict account IDs, oversized/nonfinite amounts, no unintended records/timers on rejection and inclusive/exclusive UTC+5 day boundaries.
+* **UI behavior (`test_ui.cjs`, `test_analytics_ui.cjs`):** preserved form values and canonical statuses, language-aware dates/validation, hidden-field constraints, safe rendering, stale-response isolation and statistics refresh recovery. These tests execute application JavaScript with lightweight DOM adapters; browser layout is checked separately.
 
-Verified on 24 November 2026: **56 Python tests and 6 JavaScript localization checks passed**, with no expected failures. Browser checks covered switching and remembering all three languages, preserving form input, desktop/390px layouts, successful transfers updating statistics, a failed transfer keeping statistics unchanged and showing an error, scheduled cancellation, and hidden fields not blocking unrelated forms. Browser checks used a separate temporary demo database, not the user's saved balances.
+Verified on 25 November 2026: **64 Python tests and 23 JavaScript checks passed**, with no expected failures. Browser checks covered EN/RU/KK switching and persistence, preserved form input, localized Kazakh dates, desktop/390px/320px layout widths, successful transfers, safe retries, failed transfers, scheduled cancellation and keyboard focus during polling. Two successful transfers of 100.33 and 200.67 KZT added exactly 301 KZT to the seeded 10,000 KZT total; the failed 150,000 KZT transfer and cancelled 500 KZT schedules changed neither statistics nor daily usage. Browser checks used a separate temporary demo database, not the user's saved balances.
 
 ## Security, Privacy & Ethics Compliance
 

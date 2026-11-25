@@ -128,6 +128,21 @@ class AnalyticsChecks(unittest.TestCase):
         self.assertEqual((data["week"]["totalAmount"], data["week"]["count"]), (600, 3))
         self.assertEqual((data["month"]["totalAmount"], data["month"]["count"]), (300, 1))
 
+    def test_offset_timestamps_represent_instants_at_local_period_boundaries(self):
+        # The database may contain timestamps with offsets from older imports.
+        # Compare instants, not the visible date or the timestamp string.
+        self.seed(10_000, "2026-11-01T00:00:00+05:00")
+        self.seed(20_000, "2026-11-22T23:59:59+05:00")
+        self.seed(30_000, "2026-11-23T00:00:00+05:00")
+        self.seed(40_000, "2026-11-22T14:00:00-05:00")  # Same Monday boundary
+        self.seed(50_000, "2026-11-24T15:00:00+05:00")  # Exactly asOf
+        self.seed(900_000, "2026-11-24T15:00:01+05:00")  # Future instant
+        data = self.analytics()
+        self.assertEqual((data["week"]["totalAmount"], data["week"]["count"]), (1200, 3))
+        self.assertEqual((data["month"]["totalAmount"], data["month"]["count"]), (1500, 5))
+        self.assertEqual(data["month"]["largest"]["amount"], 500)
+        self.assertEqual(data["month"]["smallest"]["amount"], 100)
+
     def test_month_end_handles_leap_year_and_exact_rollover(self):
         self.seed(10_000, "2028-02-29T18:59:59+00:00")
         self.seed(20_000, "2028-02-29T19:00:00+00:00")
@@ -193,6 +208,18 @@ class AnalyticsChecks(unittest.TestCase):
         self.assertEqual(month["largest"]["requestId"], first)
         self.assertEqual(month["smallest"]["requestId"], first)
         self.assertEqual(month["largest"]["completedAt"], early)
+
+    def test_recipient_frequency_does_not_merge_people_with_the_same_name(self):
+        with server.connect() as db:
+            db.execute("UPDATE users SET full_name='Same Name' WHERE id IN (2,3)")
+        self.seed(10_000, recipient=2)
+        self.seed(20_000, recipient=3)
+        self.assertEqual(self.analytics()["month"]["frequentRecipients"], [
+            {"recipientId": 2, "name": "Same Name", "count": 1, "totalAmount": 100},
+            {"recipientId": 3, "name": "Same Name", "count": 1, "totalAmount": 200}])
+        self.seed(30_000, recipient=3)
+        self.assertEqual(self.analytics()["month"]["frequentRecipients"], [
+            {"recipientId": 3, "name": "Same Name", "count": 2, "totalAmount": 500}])
 
     def test_worker_records_completion_once_and_receipt_views_preserve_terminal_times(self):
         completed_at = self.AS_OF

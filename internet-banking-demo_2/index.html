@@ -192,6 +192,8 @@
     "tooLong": "Use at most {max} characters.",
     "valueMinimum": "Enter a value of {min} or greater.",
     "valueMaximum": "Enter a value of {max} or less.",
+    "dateMinimum": "Choose a date and time on or after {min}.",
+    "dateMaximum": "Choose a date and time on or before {max}.",
     "validStep": "Enter a valid value with up to 2 decimal places.",
     "validValue": "Please enter a valid value.",
     "positiveAmount": "Enter a positive amount with up to 2 decimal places",
@@ -402,6 +404,8 @@
     "tooLong": "Введите не более {max} символов.",
     "valueMinimum": "Введите значение не меньше {min}.",
     "valueMaximum": "Введите значение не больше {max}.",
+    "dateMinimum": "Выберите дату и время не раньше {min}.",
+    "dateMaximum": "Выберите дату и время не позже {max}.",
     "validStep": "Введите число с точностью до двух знаков после запятой.",
     "validValue": "Введите корректное значение.",
     "positiveAmount": "Введите положительную сумму с точностью до двух знаков после запятой",
@@ -612,6 +616,8 @@
     "tooLong": "Ең көбі {max} таңба енгізіңіз.",
     "valueMinimum": "Кемінде {min} мәнін енгізіңіз.",
     "valueMaximum": "{max} мәнінен аспайтын сан енгізіңіз.",
+    "dateMinimum": "{min} уақытынан ерте емес күн мен уақытты таңдаңыз.",
+    "dateMaximum": "{max} уақытынан кеш емес күн мен уақытты таңдаңыз.",
     "validStep": "Үтірден кейін екі таңбадан аспайтын сан енгізіңіз.",
     "validValue": "Дұрыс мән енгізіңіз.",
     "positiveAmount": "Үтірден кейін екі таңбадан аспайтын оң соманы енгізіңіз",
@@ -793,10 +799,10 @@
     authMode = mode; $('authView').classList.remove('hidden'); $('bankView').classList.add('hidden'); $('userBar').classList.add('hidden'); $('authSwitch').classList.remove('hidden'); $('authForm').classList.remove('hidden'); $('passwordResetForm').classList.add('hidden');
     $('demoLogin').classList.toggle('hidden', mode !== 'login'); $('forgotButton').classList.toggle('hidden', mode !== 'login'); $('nameField').classList.toggle('hidden', mode !== 'register'); $('confirmField').classList.toggle('hidden', mode !== 'register');
     $('authName').required = mode === 'register'; $('authName').disabled = mode !== 'register'; $('authPassword').autocomplete = mode === 'login' ? 'current-password' : 'new-password'; $('authPassword').minLength = mode === 'register' ? 12 : 0; $('authPasswordConfirm').required = mode === 'register';
-    $('loginTab').classList.toggle('active', mode === 'login'); $('registerTab').classList.toggle('active', mode === 'register'); document.querySelectorAll('#authForm input').forEach(input => input.setCustomValidity('')); renderAuthText(); hideNotice($('authNotice'));
+    $('loginTab').classList.toggle('active', mode === 'login'); $('registerTab').classList.toggle('active', mode === 'register'); document.querySelectorAll('#authForm input').forEach(localizeValidity); renderAuthText(); hideNotice($('authNotice'));
   }
   function showPasswordChange() {
-    authMode = 'password-change'; $('authSwitch').classList.add('hidden'); $('authForm').classList.add('hidden'); $('passwordResetForm').classList.remove('hidden'); $('demoLogin').classList.add('hidden'); $('resetEmail').value = $('authEmail').value.trim(); renderAuthText(); hideNotice($('authNotice'));
+    authMode = 'password-change'; $('authSwitch').classList.add('hidden'); $('authForm').classList.add('hidden'); $('passwordResetForm').classList.remove('hidden'); $('demoLogin').classList.add('hidden'); $('resetEmail').value = $('authEmail').value.trim(); document.querySelectorAll('#passwordResetForm input').forEach(localizeValidity); renderAuthText(); hideNotice($('authNotice'));
   }
   function makeRequestId() { const bytes = new Uint8Array(16); crypto.getRandomValues(bytes); return 'TR-' + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('').toUpperCase(); }
   async function openBank(user) {
@@ -807,11 +813,12 @@
   function setScheduledMinimum() {
     const firstValidMinute = Math.ceil((Date.now() + 30000) / 60000) * 60000;
     $('scheduledFor').min = new Date(firstValidMinute + 5 * 3600000).toISOString().slice(0, 16);
+    localizeValidity($('scheduledFor'));
   }
   function renderLimits() { $('limitText').textContent = limits.minimum == null ? t('loadingLimits') : t('limits', {minimum:money(limits.minimum), maximum:money(limits.maximum), daily:money(limits.daily), used:money(limits.usedToday), remaining:money(limits.remainingToday)}); }
-  async function loadLimits() { limits = await api('/api/limits'); $('amount').min = limits.minimum.toFixed(2); $('amount').max = limits.maximum.toFixed(2); renderLimits(); }
+  async function loadLimits() { limits = await api('/api/limits'); $('amount').min = limits.minimum.toFixed(2); $('amount').max = limits.maximum.toFixed(2); localizeValidity($('amount')); renderLimits(); }
   async function loadRecipients() { recipients = await api('/api/recipients'); renderRecipients(); }
-  function renderRecipients() { const chosen = $('recipient').value; $('recipient').innerHTML = recipients.map(r => `<option value="${r.id}">${esc(r.name)} · ${esc(r.number)}</option>`).join(''); if (recipients.some(r => String(r.id) === chosen)) $('recipient').value = chosen; }
+  function renderRecipients() { const chosen = $('recipient').value; $('recipient').innerHTML = recipients.map(r => `<option value="${r.id}">${esc(r.name)} · ${esc(r.number)}</option>`).join(''); if (recipients.some(r => String(r.id) === chosen)) $('recipient').value = chosen; localizeValidity($('recipient')); }
   async function loadAccounts() { accounts = await api('/api/accounts'); if (!accounts.length) throw Error(I18N.en.noAccount); if (!accounts.some(a => a.id === Number(currentId))) currentId = accounts[0].id; renderAccount(); await loadHistory(); }
   function renderAccount() {
     $('accountSelect').innerHTML = accounts.map(a => `<option value="${a.id}">${esc(accountLabel(a.label))} · ${esc(a.number)}</option>`).join(''); $('accountSelect').value = currentId;
@@ -895,6 +902,7 @@
   }
   function renderTransferMode() {
     const scheduled = $('transferMode').value === 'scheduled'; $('scheduledField').classList.toggle('hidden', !scheduled); $('scheduledFor').required = scheduled; $('scheduledFor').disabled = !scheduled;
+    localizeValidity($('scheduledFor'));
     $('noteLabel').textContent = t(scheduled ? 'reminderNote' : 'description'); $('submitButton').textContent = t($('submitButton').disabled ? (scheduled ? 'scheduling' : 'submitting') : (scheduled ? 'scheduleTransfer' : 'sendTransfer')); $('transferHint').textContent = t(scheduled ? 'scheduledHint' : 'pendingHint'); $('requestId').textContent = activeRequestId || t('createdWhenSent');
   }
   function transferNotice(transfer) { return transfer.status === 'Scheduled' ? msg('scheduledNotice', {date:date(transfer.scheduledFor), description:transfer.description || t('none'), reference:transfer.requestId}) : msg('transferNotice', {status:statusText(transfer.status), amount:money(transfer.amount), recipient:transfer.to, reference:transfer.requestId}); }
@@ -912,17 +920,43 @@
     try { const previous = lastTransfer; lastTransfer = await api('/api/transfers', {method:'POST', body:JSON.stringify({requestId:previous.requestId, fromAccountId:previous.fromAccountId, toAccountId:previous.toAccountId, amount:previous.amount, description:previous.description})}); notice($('notice'), () => msg('retryNotice', {status:statusText(lastTransfer.status)}), () => transferNoticeKind(lastTransfer), () => transferActions(lastTransfer)); await Promise.all([loadAccounts(), loadLimits()]); } catch (error) { reportError($('notice'), error); }
   }
   function clearForNew() { activeRequestId = null; lastTransfer = null; $('requestId').textContent = t('createdWhenSent'); hideNotice($('notice')); }
-  function newTransfer() { clearForNew(); $('amount').value = ''; $('description').value = ''; $('amount').focus(); }
+  function newTransfer() { clearForNew(); $('amount').value = ''; $('description').value = ''; localizeValidity($('amount')); localizeValidity($('description')); $('amount').focus(); }
 
+  function validationBound(input, value) {
+    if (input.type === 'datetime-local') return date(value + '+05:00');
+    if (input.type === 'date') return date(value + 'T00:00:00+05:00');
+    const number = Number(value);
+    return Number.isFinite(number) ? new Intl.NumberFormat(LOCALES[language], {maximumFractionDigits:20}).format(number) : value;
+  }
   function localizeValidity(input) {
-    input.setCustomValidity(''); const validity = input.validity; let message = '';
-    if (validity.valueMissing) message = t('requiredField'); else if (validity.typeMismatch && input.type === 'email') message = t('validEmail'); else if (validity.tooShort) message = t('tooShort', {min:input.minLength}); else if (validity.tooLong) message = t('tooLong', {max:input.maxLength}); else if (validity.rangeUnderflow) message = t('valueMinimum', {min:input.min}); else if (validity.rangeOverflow) message = t('valueMaximum', {max:input.max}); else if (validity.stepMismatch) message = t('validStep'); else if (!validity.valid) message = t('validValue'); input.setCustomValidity(message);
+    input.setCustomValidity('');
+    input.setAttribute('lang', language);
+    if (input.willValidate === false) return;
+    const validity = input.validity, isDate = ['date','datetime-local'].includes(input.type);
+    let message = '';
+    if (validity.badInput) message = t(isDate ? 'validSchedule' : input.type === 'number' ? 'validAmount' : 'validValue');
+    else if (validity.valueMissing) message = t('requiredField');
+    else if (validity.typeMismatch && input.type === 'email') message = t('validEmail');
+    else if (validity.tooShort) message = t('tooShort', {min:input.minLength});
+    else if (validity.tooLong) message = t('tooLong', {max:input.maxLength});
+    else if (validity.rangeUnderflow) message = t(isDate ? 'dateMinimum' : 'valueMinimum', {min:validationBound(input, input.min)});
+    else if (validity.rangeOverflow) message = t(isDate ? 'dateMaximum' : 'valueMaximum', {max:validationBound(input, input.max)});
+    else if (validity.stepMismatch) message = t(isDate ? 'validSchedule' : input.type === 'number' ? 'validStep' : 'validValue');
+    else if (!validity.valid) message = t('validValue');
+    input.setCustomValidity(message);
+  }
+  function setupValidation() {
+    document.querySelectorAll('input,select,textarea').forEach(input => {
+      // Translate before native hover/submission UI can use the browser language.
+      for (const event of ['invalid','input','change','focus']) input.addEventListener(event, () => localizeValidity(input));
+      localizeValidity(input);
+    });
   }
   function applyLanguage() {
     document.documentElement.lang = language; document.title = t('pageTitle'); document.querySelectorAll('[data-language]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.language === language)));
     document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n)); document.querySelectorAll('[data-i18n-placeholder]').forEach(el => el.placeholder = t(el.dataset.i18nPlaceholder)); document.querySelectorAll('[data-i18n-aria]').forEach(el => el.setAttribute('aria-label', t(el.dataset.i18nAria)));
     renderAuthText(); renderTransferMode(); renderLimits(); renderAccount(); renderRecipients(); renderHistory(); renderAudit(); renderDetails(); $('auditToggle').textContent = t($('auditPanel').classList.contains('hidden') ? 'auditLog' : 'hideAuditLog');
-    for (const id of notices.keys()) renderNotice($(id)); document.querySelectorAll('input,select,textarea').forEach(input => { if (input.validity.customError) localizeValidity(input); }); document.dispatchEvent(new Event('languagechange'));
+    for (const id of notices.keys()) renderNotice($(id)); document.querySelectorAll('input,select,textarea').forEach(localizeValidity); document.dispatchEvent(new Event('languagechange'));
   }
   function setLanguage(value) { language = Object.hasOwn(I18N, value) ? value : 'en'; try { localStorage.setItem(LANGUAGE_STORAGE_KEY, language); } catch {} applyLanguage(); }
   document.querySelectorAll('[data-language]').forEach(button => { button.onclick = () => setLanguage(button.dataset.language); });
@@ -938,16 +972,16 @@
   $('logoutButton').onclick = async () => { const request = api('/api/logout', {method:'POST', body:'{}'}); resetBankState(); showAuth('login'); $('authButton').disabled = true; try { await request; } catch {} finally { $('authButton').disabled = false; } };
   $('auditToggle').onclick = async () => { const panel = $('auditPanel'), opening = panel.classList.contains('hidden'); panel.classList.toggle('hidden', !opening); $('auditToggle').textContent = t(opening ? 'hideAuditLog' : 'auditLog'); if (opening) { try { await loadAudit(); } catch (error) { reportError($('notice'), error); } } };
   ['historySearch','historyFrom','historyTo','historyMin','historyMax'].forEach(id => $(id).addEventListener('input', renderHistory)); $('historyStatus').addEventListener('change', renderHistory);
-  $('clearHistoryFilters').onclick = () => { ['historySearch','historyStatus','historyFrom','historyTo','historyMin','historyMax'].forEach(id => $(id).value = ''); renderHistory(); };
+  $('clearHistoryFilters').onclick = () => { ['historySearch','historyStatus','historyFrom','historyTo','historyMin','historyMax'].forEach(id => { $(id).value = ''; localizeValidity($(id)); }); renderHistory(); };
   $('accountSelect').onchange = () => { currentId = Number($('accountSelect').value); clearForNew(); renderAccount(); };
   $('closeDetails').onclick = () => $('detailsDialog').close(); $('detailsDialog').addEventListener('close', () => { detailRequest++; selectedTransferDetails = null; });
   $('detailsDialog').addEventListener('click', event => { if (event.target === $('detailsDialog')) $('detailsDialog').close(); }); $('downloadDetailReceipt').onclick = () => downloadTransferReceipt(selectedTransferDetails);
-  $('transferMode').onchange = () => { renderTransferMode(); setScheduledMinimum(); clearForNew(); $('scheduledFor').setCustomValidity(''); };
+  $('transferMode').onchange = () => { renderTransferMode(); setScheduledMinimum(); clearForNew(); };
   $('transferForm').onsubmit = async event => {
     event.preventDefault(); const button = $('submitButton'), scheduled = $('transferMode').value === 'scheduled'; button.disabled = true; renderTransferMode();
     try { activeRequestId ||= makeRequestId(); $('requestId').textContent = activeRequestId; const body = {requestId:activeRequestId, fromAccountId:currentId, toAccountId:Number($('recipient').value), amount:$('amount').value}; let endpoint = '/api/transfers'; if (scheduled) { body.scheduledFor = $('scheduledFor').value; body.reminderNote = $('description').value; endpoint = '/api/scheduled'; } else body.description = $('description').value; lastTransfer = await api(endpoint, {method:'POST', body:JSON.stringify(body)}); notice($('notice'), () => transferNotice(lastTransfer), () => transferNoticeKind(lastTransfer), () => transferActions(lastTransfer)); await Promise.all([loadAccounts(), loadLimits()]); } catch (error) { reportError($('notice'), error); } finally { button.disabled = false; renderTransferMode(); }
   };
-  document.querySelectorAll('input,select,textarea').forEach(input => { input.addEventListener('invalid', () => localizeValidity(input)); input.addEventListener('input', () => input.setCustomValidity('')); input.addEventListener('change', () => input.setCustomValidity('')); });
+  setupValidation();
   setInterval(async () => { if (refreshing || $('bankView').classList.contains('hidden')) return; refreshing = true; try { await Promise.all([loadAccounts(), loadLimits()]); if (!$('auditPanel').classList.contains('hidden')) await loadAudit(); document.dispatchEvent(new Event('bankrefresh')); } catch {} finally { refreshing = false; } }, 2000);
   applyLanguage(); setScheduledMinimum();
   (async () => { try { const session = await api('/api/session'); if (session.authenticated) { csrfToken = session.csrfToken; await openBank(session.user); } else showAuth('login'); } catch (error) { if (error.name !== 'AbortError') { showAuth('login'); reportError($('authNotice'), error); } } })();

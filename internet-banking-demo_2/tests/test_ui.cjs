@@ -91,11 +91,13 @@ function appHarness(now = Date.parse('2026-11-25T10:20:59Z')) {
     const attrs = Object.fromEntries([...attributes.matchAll(/([\w-]+)="([^"]*)"/g)].map(match => [match[1], match[2]]));
     const classes = new Set((attrs.class || '').split(/\s+/).filter(Boolean));
     let value = attrs.value || '', markup = '', content = '';
+    const listeners = new Map();
     const node = {
       id: attrs.id || '', tagName: tag.toUpperCase(), type: attrs.type || '',
       min: attrs.min || '', max: attrs.max || '', minLength: Number(attrs.minlength || 0),
       disabled: false, required: false, children: [], dataset: {}, htmlWrites: 0,
       validity: {valid: true, customError: false},
+      get willValidate() { return !this.disabled; },
       classList: {
         contains: name => classes.has(name),
         add: name => classes.add(name), remove: name => classes.delete(name),
@@ -104,8 +106,16 @@ function appHarness(now = Date.parse('2026-11-25T10:20:59Z')) {
       setAttribute(name, content) { attrs[name] = String(content); },
       getAttribute(name) { return attrs[name]; },
       setCustomValidity(message) { this.validationMessage = message; this.validity.customError = Boolean(message); },
+      addEventListener(type, listener) {
+        if (!listeners.has(type)) listeners.set(type, []);
+        listeners.get(type).push(listener);
+      },
+      dispatchEvent(event) {
+        for (const listener of listeners.get(event.type) || []) listener.call(this, { ...event, target: this });
+        return true;
+      },
       append(...children) { this.children.push(...children); },
-      focus() { document.activeElement = this; },
+      focus() { document.activeElement = this; this.dispatchEvent({type: 'focus'}); },
       get textContent() { return content + this.children.map(child => typeof child === 'string' ? child : child.textContent).join(''); },
       set textContent(next) {
         if (this.children.includes(document.activeElement)) document.activeElement = null;
@@ -134,6 +144,7 @@ function appHarness(now = Date.parse('2026-11-25T10:20:59Z')) {
     querySelectorAll(selector) {
       if (selector === 'input,select,textarea') return elements.filter(node => ['INPUT','SELECT','TEXTAREA'].includes(node.tagName));
       if (selector === '#authForm input') return ['authName','authEmail','authPassword','authPasswordConfirm'].map(id => byId.get(id));
+      if (selector === '#passwordResetForm input') return ['resetEmail','oldPassword','newPassword','newPasswordConfirm'].map(id => byId.get(id));
       const attribute = selector.match(/^\[([^\]]+)\]$/)?.[1];
       return attribute ? elements.filter(node => node.getAttribute(attribute) !== undefined) : [];
     },
@@ -299,10 +310,175 @@ test('Existing input validation changes language without changing the entered am
   amount.value = '10'; amount.min = '100.00';
   amount.validity = {valid:false, customError:false, rangeUnderflow:true};
   app.run("language = 'en'; localizeValidity($('amount'))");
-  assert.equal(amount.validationMessage, catalog.en.valueMinimum.replace('{min}','100.00'));
+  assert.equal(amount.validationMessage, catalog.en.valueMinimum.replace('{min}','100'));
   app.run("setLanguage('kk')");
-  assert.equal(amount.validationMessage, catalog.kk.valueMinimum.replace('{min}','100.00'));
+  assert.equal(amount.validationMessage, catalog.kk.valueMinimum.replace('{min}','100'));
   assert.equal(amount.value, '10');
+});
+
+test('Amount validation is translated on edits and focus before any form submission', () => {
+  const app = appHarness();
+  app.run('setupValidation()');
+  const amount = app.get('amount');
+  amount.min = '100.00'; amount.max = '500.00';
+  // Native constraint flags are supplied by the browser. Exercise the real
+  // listeners with those flags rather than reimplementing browser validation.
+  const cases = [
+    {value:'10', flag:'rangeUnderflow', event:'input', key:'valueMinimum', parameter:'min', bound:'100'},
+    {value:'600', flag:'rangeOverflow', event:'change', key:'valueMaximum', parameter:'max', bound:'500'},
+    {value:'100.001', flag:'stepMismatch', event:'focus', key:'validStep'},
+  ];
+  for (const language of ['en','ru','kk']) {
+    app.run(`language = '${language}'`);
+    for (const item of cases) {
+      amount.value = item.value;
+      amount.validity = {valid:false, customError:false, [item.flag]:true};
+      amount.dispatchEvent({type:item.event});
+      const expected = item.parameter
+        ? catalog[language][item.key].replace(`{${item.parameter}}`, item.bound)
+        : catalog[language][item.key];
+      assert.equal(amount.validationMessage, expected, `${language}: ${item.event} must localize immediately`);
+      assert.equal(amount.value, item.value);
+    }
+    amount.value = '125.50';
+    amount.validity = {valid:true, customError:true};
+    amount.dispatchEvent({type:'input'});
+    assert.equal(amount.validationMessage, '', `${language}: fixing the amount must remove the error`);
+    assert.equal(amount.validity.customError, false);
+  }
+});
+
+test('Required and email errors follow the chosen language on focus and typing', () => {
+  const app = appHarness();
+  app.run('setupValidation()');
+  const email = app.get('authEmail');
+  for (const language of ['en','ru','kk']) {
+    app.run(`language = '${language}'`);
+    email.value = '';
+    email.validity = {valid:false, customError:false, valueMissing:true};
+    email.focus();
+    assert.equal(email.validationMessage, catalog[language].requiredField);
+    email.value = 'invalid-address';
+    email.validity = {valid:false, customError:false, typeMismatch:true};
+    email.dispatchEvent({type:'input'});
+    assert.equal(email.validationMessage, catalog[language].validEmail);
+    email.value = 'malika@example.test';
+    email.validity = {valid:true, customError:true};
+    email.dispatchEvent({type:'change'});
+    assert.equal(email.validationMessage, '');
+  }
+});
+
+test('Changing language translates untouched native errors before their first invalid event', () => {
+  const app = appHarness();
+  const amount = app.get('amount');
+  amount.value = '10'; amount.min = '100.00';
+  amount.validity = {valid:false, customError:false, rangeUnderflow:true};
+  // No submit, invalid event, or prior custom validation occurred.
+  app.run("setLanguage('kk')");
+  assert.equal(amount.validationMessage, catalog.kk.valueMinimum.replace('{min}', '100'));
+  assert.equal(amount.value, '10');
+  app.run("setLanguage('ru')");
+  assert.equal(amount.validationMessage, catalog.ru.valueMinimum.replace('{min}', '100'));
+});
+
+test('Disabled scheduled fields do not keep validation errors or block immediate transfers', () => {
+  const app = appHarness();
+  app.run('setupValidation()');
+  const scheduled = app.get('scheduledFor');
+  app.get('transferMode').value = 'scheduled';
+  app.run('renderTransferMode()');
+  scheduled.value = '';
+  scheduled.validity = {valid:false, customError:false, valueMissing:true};
+  scheduled.dispatchEvent({type:'change'});
+  assert.equal(scheduled.validationMessage, catalog.en.requiredField);
+  app.get('transferMode').value = 'now';
+  app.run('renderTransferMode()');
+  app.run("setLanguage('kk')");
+  scheduled.dispatchEvent({type:'focus'});
+  assert.equal(scheduled.willValidate, false);
+  assert.equal(scheduled.validationMessage, '');
+  assert.equal(scheduled.validity.customError, false);
+});
+
+test('Validation boundaries show localized numbers and readable scheduled dates', () => {
+  const app = appHarness();
+  app.run('setupValidation()');
+  const amount = app.get('amount'), scheduled = app.get('scheduledFor');
+  for (const [language, decimal] of [['en','100.5'], ['ru','100,5'], ['kk','100,5']]) {
+    app.run(`language = '${language}'`);
+    amount.value = '10'; amount.min = '100.50';
+    amount.validity = {valid:false, customError:false, rangeUnderflow:true};
+    amount.dispatchEvent({type:'input'});
+    assert.equal(amount.validationMessage, catalog[language].valueMinimum.replace('{min}', decimal));
+    app.get('transferMode').value = 'scheduled';
+    app.run('renderTransferMode()');
+    scheduled.min = '2026-11-27T14:30'; scheduled.value = '2026-11-26T14:30';
+    scheduled.validity = {valid:false, customError:false, rangeUnderflow:true};
+    scheduled.dispatchEvent({type:'change'});
+    const readable = app.run("date('2026-11-27T14:30+05:00')");
+    assert.equal(scheduled.validationMessage, catalog[language].dateMinimum.replace('{min}', readable));
+    assert.ok(!scheduled.validationMessage.includes('T14:30'), 'The user must not see the raw datetime value');
+  }
+});
+
+test('Malformed numbers and dates show a helpful translated error before required or step errors', () => {
+  const app = appHarness();
+  app.run('setupValidation()');
+  const amount = app.get('amount'), scheduled = app.get('scheduledFor');
+  for (const language of ['en','ru','kk']) {
+    app.run(`language = '${language}'`);
+    amount.value = '';
+    amount.validity = {valid:false, customError:false, badInput:true, valueMissing:true};
+    amount.dispatchEvent({type:'input'});
+    assert.equal(amount.validationMessage, catalog[language].validAmount);
+    app.get('transferMode').value = 'scheduled';
+    app.run('renderTransferMode()');
+    scheduled.validity = {valid:false, customError:false, badInput:true, valueMissing:true};
+    scheduled.dispatchEvent({type:'input'});
+    assert.equal(scheduled.validationMessage, catalog[language].validSchedule);
+    scheduled.value = '2026-11-27T14:30:25';
+    scheduled.validity = {valid:false, customError:false, stepMismatch:true};
+    scheduled.dispatchEvent({type:'change'});
+    assert.equal(scheduled.validationMessage, catalog[language].validSchedule);
+  }
+});
+
+test('Refreshed backend limits immediately revalidate the entered amount', async () => {
+  const app = appHarness();
+  const amount = app.get('amount');
+  amount.value = '500'; amount.min = '100.00'; amount.max = '5000.00';
+  Object.defineProperty(amount, 'validity', {get() {
+    const rangeUnderflow = Number(this.value) < Number(this.min);
+    const rangeOverflow = Number(this.value) > Number(this.max);
+    const customError = Boolean(this.validationMessage);
+    return {valid:!rangeUnderflow && !rangeOverflow && !customError, rangeUnderflow, rangeOverflow, customError};
+  }});
+  app.run("language = 'kk'; setupValidation()");
+  assert.equal(amount.validationMessage, '');
+  app.run("api = async () => ({minimum:1000,maximum:5000,daily:10000,usedToday:0,remainingToday:10000})");
+  await app.run('loadLimits()');
+  const minimum = new Intl.NumberFormat('kk-KZ').format(1000);
+  assert.equal(amount.validationMessage, catalog.kk.valueMinimum.replace('{min}', minimum));
+  app.run("api = async () => ({minimum:100,maximum:5000,daily:10000,usedToday:0,remainingToday:10000})");
+  await app.run('loadLimits()');
+  assert.equal(amount.validationMessage, '');
+  assert.equal(amount.value, '500');
+});
+
+test('Loading recipient choices clears the initial required error once an option is selected', () => {
+  const app = appHarness();
+  const recipient = app.get('recipient');
+  recipient.value = '';
+  Object.defineProperty(recipient, 'validity', {get() {
+    const valueMissing = !this.value, customError = Boolean(this.validationMessage);
+    return {valid:!valueMissing && !customError, valueMissing, customError};
+  }});
+  app.run("language = 'kk'; setupValidation()");
+  assert.equal(recipient.validationMessage, catalog.kk.requiredField);
+  app.run("recipients = [{id:2,name:'Amina',number:'KZ2'}]; renderRecipients()");
+  assert.equal(recipient.value, '2');
+  assert.equal(recipient.validationMessage, '');
 });
 
 test('History and receipts escape user text and retain status and reference', () => {

@@ -156,6 +156,23 @@ class ScheduledTransferChecks(unittest.TestCase):
             self.assertEqual(self.schedule(number, scheduledFor=value)[0], 201)
             self.assertEqual(self.scheduled_row(number)["scheduled_for"], "2026-11-24T08:02:00+00:00")
 
+    def test_out_of_range_utc_dates_return_validation_errors(self):
+        for number, value in enumerate(("0001-01-01T00:00:00+23:00", "9999-12-31T23:59:59-23:00"), 1):
+            with self.subTest(value=value):
+                code, _, data = self.schedule(number, scheduledFor=value)
+                self.assertEqual(code, 400)
+                self.assertIn("valid scheduled date", data["error"])
+                self.assertIsNone(self.scheduled_row(number))
+        self.timer.assert_not_called()
+
+    def test_fractional_scheduled_time_is_not_truncated_to_an_earlier_instant(self):
+        FrozenDateTime.current = FrozenDateTime.current.replace(microsecond=900000)
+        due = FrozenDateTime.current + timedelta(seconds=30)
+        code, _, _ = self.schedule(scheduledFor=due.isoformat())
+        self.assertEqual(code, 201)
+        self.assertEqual(datetime.fromisoformat(self.scheduled_row()["scheduled_for"]), due)
+        self.timer.assert_called_once_with(30.0, server.process_scheduled_transfer, args=(self.reference(1),))
+
     def test_create_validates_amount_account_ownership_and_note_length(self):
         cases = ({"amount": "99.99"}, {"amount": "1000000.01"}, {"amount": "100.001"},
                  {"fromAccountId": 2}, {"toAccountId": 1}, {"toAccountId": 999},

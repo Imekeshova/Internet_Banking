@@ -237,11 +237,11 @@ def insert_audit(db: sqlite3.Connection, actor_user_id: int | None, action: str,
 def parse_scheduled_for(value: str) -> datetime:
     try:
         due = datetime.fromisoformat(value)
-    except (TypeError, ValueError) as exc:
+        if due.tzinfo is None:
+            due = due.replace(tzinfo=KZ_TIMEZONE)
+        return due.astimezone(timezone.utc)
+    except (TypeError, ValueError, OverflowError) as exc:
         raise ValueError("Choose a valid scheduled date and time") from exc
-    if due.tzinfo is None:
-        due = due.replace(tzinfo=KZ_TIMEZONE)
-    return due.astimezone(timezone.utc)
 
 
 def schedule_pending() -> None:
@@ -368,11 +368,31 @@ def process_scheduled_transfer(request_id: str) -> None:
         print(f"Could not process scheduled transfer {request_id}: {exc}")
 
 
+def account_id_from(value) -> int:
+    """Reject fractional/boolean IDs instead of silently selecting another account."""
+    message = "Choose one of your accounts and a different recipient"
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        raise ValueError(message)
+    if isinstance(value, str) and not re.fullmatch(r"[0-9]+", value):
+        raise ValueError(message)
+    try:
+        account_id = int(value)
+    except ValueError as exc:
+        raise ValueError(message) from exc
+    if not 0 < account_id <= 2**63 - 1:
+        raise ValueError(message)
+    return account_id
+
+
 def cents_from(value) -> int:
     try:
         amount = Decimal(str(value))
         if not amount.is_finite() or amount <= 0 or amount.as_tuple().exponent < -2:
             raise ValueError("Enter a positive amount with up to 2 decimal places")
+        # Bound before multiplication/int conversion: large exponents must be a
+        # validation error, not Decimal overflow or an oversized SQLite integer.
+        if amount > Decimal(2**63 - 1) / CENT:
+            raise ValueError("Enter a valid transfer amount")
         cents = int(amount * CENT)
     except (InvalidOperation, TypeError, ValueError) as exc:
         if isinstance(exc, ValueError) and str(exc):
@@ -742,8 +762,8 @@ class Handler(BaseHTTPRequestHandler):
             request_id = str(payload.get("requestId", "")).strip()
             if not re.fullmatch(r"TR-[A-F0-9]{32}", request_id):
                 raise ValueError("Transfer reference is invalid. Please start a new transfer")
-            sender_id = int(payload.get("fromAccountId", 0))
-            recipient_id = int(payload.get("toAccountId", 0))
+            sender_id = account_id_from(payload.get("fromAccountId", 0))
+            recipient_id = account_id_from(payload.get("toAccountId", 0))
             cents = cents_from(payload.get("amount", 0))
             description = str(payload.get("description", "")).strip()
             if len(description) > 200:
@@ -824,8 +844,8 @@ class Handler(BaseHTTPRequestHandler):
             request_id = str(payload.get("requestId", "")).strip()
             if not re.fullmatch(r"TR-[A-F0-9]{32}", request_id):
                 raise ValueError("Transfer reference is invalid. Please start a new transfer")
-            sender_id = int(payload.get("fromAccountId", 0))
-            recipient_id = int(payload.get("toAccountId", 0))
+            sender_id = account_id_from(payload.get("fromAccountId", 0))
+            recipient_id = account_id_from(payload.get("toAccountId", 0))
             cents = cents_from(payload.get("amount", 0))
             reminder = str(payload.get("reminderNote", "")).strip()
             due = parse_scheduled_for(str(payload.get("scheduledFor", "")))
@@ -862,7 +882,7 @@ class Handler(BaseHTTPRequestHandler):
                 db.rollback()
                 self.send_json(409, {"error": "This transfer reference is already in use"})
                 return
-            due_text = due.isoformat(timespec="seconds")
+            due_text = due.isoformat()
             timestamp = now()
             db.execute("""INSERT INTO scheduled_transfers(request_id,user_id,sender_account_id,recipient_account_id,
                 amount_cents,scheduled_for,reminder_note,status,failure_reason,created_at,updated_at)

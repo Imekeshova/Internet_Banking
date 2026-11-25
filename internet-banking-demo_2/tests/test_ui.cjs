@@ -67,6 +67,15 @@ test('Status filtering preserves canonical API values in every language', () => 
   assert.deepEqual(values, ['', 'Pending', 'Completed', 'Failed', 'Scheduled', 'Cancelled']);
 });
 
+test('Language switching uses direct accessible buttons and persists selection', () => {
+  const languages = [...html.matchAll(/data-language="(en|ru|kk)"/g)].map(m => m[1]);
+  assert.deepEqual(languages, ['en', 'ru', 'kk']);
+  assert.match(html, /role="group"[^>]*id="languageControl"/);
+  assert.match(html, /button\.onclick\s*=\s*\(\)\s*=>\s*setLanguage\(button\.dataset\.language\)/);
+  assert.match(html, /button\.setAttribute\('aria-pressed',\s*String\(button\.dataset\.language === language\)\)/);
+  assert.doesNotMatch(html, /id="languageSelect"/);
+});
+
 test('Inline application scripts parse before reaching the browser', () => {
   for (const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) {
     new vm.Script(match[1]);

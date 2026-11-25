@@ -20,7 +20,7 @@
   <link rel="stylesheet" href="/analytics.css">
 </head>
 <body>
-  <header class="top"><div class="brand"><div class="brandmark">↗</div><div>Northstar Bank<small data-i18n="brandSubtitle">INTERNET BANKING DEMO</small></div></div><div class="top-actions"><label class="language-control"><span data-i18n="language">Language</span><select id="languageSelect" data-i18n-aria="language"><option value="en" lang="en">English</option><option value="ru" lang="ru">Русский</option><option value="kk" lang="kk">Қазақша</option></select></label><div class="topright hidden" id="userBar"><button class="hidden" id="auditToggle" type="button" data-i18n="auditLog">Audit log</button><span id="userEmail"></span><div class="avatar" id="avatar">A</div><button id="logoutButton" data-i18n="signOut">Sign out</button></div></div></header>
+  <header class="top"><div class="brand"><div class="brandmark">↗</div><div>Northstar Bank<small data-i18n="brandSubtitle">INTERNET BANKING DEMO</small></div></div><div class="top-actions"><div class="language-control" role="group" id="languageControl" data-i18n-aria="language" aria-label="Language"><button type="button" data-language="en" lang="en" aria-pressed="true">EN</button><button type="button" data-language="ru" lang="ru" aria-pressed="false">RU</button><button type="button" data-language="kk" lang="kk" aria-pressed="false">KK</button></div><div class="topright hidden" id="userBar"><button class="hidden" id="auditToggle" type="button" data-i18n="auditLog">Audit log</button><span id="userEmail"></span><div class="avatar" id="avatar">A</div><button id="logoutButton" data-i18n="signOut">Sign out</button></div></div></header>
   <main id="authView" class="auth-wrap hidden">
     <section class="card auth-card"><div class="eyebrow" data-i18n="secureAccess">Secure access</div><h1 id="authTitle" data-i18n="welcome">Welcome back</h1><p id="authSubtitle" data-i18n="loginSubtitle">Sign in to view your demo account.</p>
       <div class="auth-switch" id="authSwitch"><button id="loginTab" class="active" type="button" data-i18n="signIn">Sign in</button><button id="registerTab" type="button" data-i18n="createAccount">Create account</button></div>
@@ -889,13 +889,13 @@
     if (validity.valueMissing) message = t('requiredField'); else if (validity.typeMismatch && input.type === 'email') message = t('validEmail'); else if (validity.tooShort) message = t('tooShort', {min:input.minLength}); else if (validity.tooLong) message = t('tooLong', {max:input.maxLength}); else if (validity.rangeUnderflow) message = t('valueMinimum', {min:input.min}); else if (validity.rangeOverflow) message = t('valueMaximum', {max:input.max}); else if (validity.stepMismatch) message = t('validStep'); else if (!validity.valid) message = t('validValue'); input.setCustomValidity(message);
   }
   function applyLanguage() {
-    document.documentElement.lang = language; document.title = t('pageTitle'); $('languageSelect').value = language;
+    document.documentElement.lang = language; document.title = t('pageTitle'); document.querySelectorAll('[data-language]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.language === language)));
     document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n)); document.querySelectorAll('[data-i18n-placeholder]').forEach(el => el.placeholder = t(el.dataset.i18nPlaceholder)); document.querySelectorAll('[data-i18n-aria]').forEach(el => el.setAttribute('aria-label', t(el.dataset.i18nAria)));
     renderAuthText(); renderTransferMode(); renderLimits(); renderAccount(); renderRecipients(); renderHistory(); renderAudit(); renderDetails(); $('auditToggle').textContent = t($('auditPanel').classList.contains('hidden') ? 'auditLog' : 'hideAuditLog');
     for (const id of notices.keys()) renderNotice($(id)); document.querySelectorAll('input,select,textarea').forEach(input => { if (input.validity.customError) localizeValidity(input); }); document.dispatchEvent(new Event('languagechange'));
   }
   function setLanguage(value) { language = Object.hasOwn(I18N, value) ? value : 'en'; try { localStorage.setItem(LANGUAGE_STORAGE_KEY, language); } catch {} applyLanguage(); }
-  $('languageSelect').onchange = event => setLanguage(event.target.value);
+  document.querySelectorAll('[data-language]').forEach(button => { button.onclick = () => setLanguage(button.dataset.language); });
   $('loginTab').onclick = () => showAuth('login'); $('registerTab').onclick = () => showAuth('register'); $('forgotButton').onclick = showPasswordChange; $('backToLogin').onclick = () => showAuth('login');
   $('authForm').onsubmit = async event => {
     event.preventDefault(); const button = $('authButton'); button.disabled = true;

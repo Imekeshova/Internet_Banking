@@ -7,7 +7,10 @@
 .transfer-card{align-self:start}
 .sectionhead{align-items:flex-start;gap:12px}
 .sectionhead>span{text-align:right}
-.language-control select{background:#f3f7f4;border-color:#dce7df;font-weight:600;min-height:40px}
+.language-control{display:flex;align-items:center;gap:4px;padding:3px;border:1px solid #dce7df;border-radius:10px;background:#f3f7f4}
+.language-control button{min-width:38px;min-height:34px;padding:5px 8px;border:0;border-radius:7px;background:transparent;color:var(--muted);font-size:12px;font-weight:700}
+.language-control button[aria-pressed="true"]{background:#fff;color:var(--green);box-shadow:0 1px 3px #15292318}
+.language-control button:hover{color:var(--green)}
 .primary{min-height:44px;transition:background .15s ease}
 button:focus-visible,a:focus-visible{outline:3px solid #78b799;outline-offset:3px}
 .history-filters{grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;padding:12px;background:#f8faf8;border-radius:10px}
@@ -33,7 +36,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #78b799;outline-offset:3p
   .brand{min-width:0;font-size:14px}
   .brandmark{flex:none}
   .brand small{font-size:8px}
-  .language-control select{max-width:118px;font-size:12px}
+  .language-control button{min-width:34px;min-height:32px;padding:4px 6px}
   .history-filters{grid-template-columns:repeat(2,minmax(0,1fr));padding:10px}
   .history-filters #historySearch{grid-column:1/-1}
   .sectionhead{flex-wrap:wrap;gap:5px}

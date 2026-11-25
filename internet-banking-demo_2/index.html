@@ -42,7 +42,7 @@
     <div class="greeting"><div><div class="eyebrow" data-i18n="personalBanking">Personal banking</div><h1><span data-i18n="greeting">Good day,</span> <span id="customerName">—</span></h1></div><label class="switcher"><span data-i18n="yourAccount">Your account</span> <select id="accountSelect" aria-label="Choose account" data-i18n-aria="chooseAccount"></select></label></div>
     <div class="layout"><div>
       <section class="card balance-card" aria-label="Account balance" data-i18n-aria="accountBalance"><div class="balance-label" data-i18n="availableBalance">Available balance</div><div class="balance" id="balance">₸—</div><div class="card-bottom"><div><span id="accountLabel" data-i18n="account">Account</span><strong id="accountNumber">••••</strong></div><div class="account-icon">₸</div></div></section>
-      <section class="card history lower"><div class="sectionhead"><h2 data-i18n="recentActivity">Recent activity</h2><span id="transferCount" data-i18n="latestActivity">Latest activity</span></div><div class="history-filters" aria-label="Search and filter transfers" data-i18n-aria="searchFilterTransfers"><input id="historySearch" type="search" placeholder="Search recipient, description, or reference" data-i18n-placeholder="searchPlaceholder" aria-label="Search transfers" data-i18n-aria="searchTransfers"><select id="historyStatus" aria-label="Filter by status" data-i18n-aria="filterStatus"><option value="" data-i18n="allStatuses">All statuses</option><option value="Pending" data-i18n="statusPending">Pending</option><option value="Completed" data-i18n="statusCompleted">Completed</option><option value="Failed" data-i18n="statusFailed">Failed</option><option value="Scheduled" data-i18n="statusScheduled">Scheduled</option><option value="Cancelled" data-i18n="statusCancelled">Cancelled</option></select><input id="historyFrom" type="date" aria-label="From date" data-i18n-aria="fromDate"><input id="historyTo" type="date" aria-label="To date" data-i18n-aria="toDate"><input id="historyMin" type="number" min="0" step="0.01" placeholder="Min KZT" data-i18n-placeholder="minKzt" aria-label="Minimum amount" data-i18n-aria="minimumAmount"><input id="historyMax" type="number" min="0" step="0.01" placeholder="Max KZT" data-i18n-placeholder="maxKzt" aria-label="Maximum amount" data-i18n-aria="maximumAmount"><button id="clearHistoryFilters" class="rowaction" type="button" data-i18n="clearFilters">Clear filters</button></div><div id="historyBody" class="empty" data-i18n="loadingActivity">Loading activity…</div></section>
+      <section class="card history lower"><div class="sectionhead"><h2 data-i18n="recentActivity">Recent activity</h2><span id="transferCount" data-i18n="latestActivity">Latest activity</span></div><div class="history-filters" aria-label="Search and filter transfers" data-i18n-aria="searchFilterTransfers"><input id="historySearch" type="search" placeholder="Search recipient, description, or reference" data-i18n-placeholder="searchPlaceholder" aria-label="Search transfers" data-i18n-aria="searchTransfers"><select id="historyStatus" aria-label="Filter by status" data-i18n-aria="filterStatus"><option value="" data-i18n="allStatuses">All statuses</option><option value="Pending" data-i18n="statusPending">Pending</option><option value="Completed" data-i18n="statusCompleted">Completed</option><option value="Failed" data-i18n="statusFailed">Failed</option><option value="Scheduled" data-i18n="statusScheduled">Scheduled</option><option value="Cancelled" data-i18n="statusCancelled">Cancelled</option></select><input id="historyFrom" type="date" aria-label="From date" data-i18n-aria="fromDate"><input id="historyTo" type="date" aria-label="To date" data-i18n-aria="toDate"><input id="historyMin" type="number" min="0" step="0.01" placeholder="Min KZT" data-i18n-placeholder="minKzt" aria-label="Minimum amount" data-i18n-aria="minimumAmount"><input id="historyMax" type="number" min="0" step="0.01" placeholder="Max KZT" data-i18n-placeholder="maxKzt" aria-label="Maximum amount" data-i18n-aria="maximumAmount"><button id="clearHistoryFilters" class="rowaction" type="button" data-i18n="clearFilters">Clear filters</button></div><div id="historyBody" class="empty">Loading activity…</div></section>
     </div>
     <section class="card transfer-card"><div class="sectionhead"><h2 data-i18n="makeTransfer">Make a transfer</h2><span data-i18n="withinBank">Within Northstar</span></div>
       <form id="transferForm"><div class="field"><label for="recipient" data-i18n="sendTo">Send to</label><select id="recipient" required></select></div>
@@ -705,7 +705,21 @@
   function money(value) { return new Intl.NumberFormat(LOCALES[language], {style:'currency', currency:'KZT', minimumFractionDigits:2, maximumFractionDigits:2}).format(value); }
   // Use the project's fixed UTC+5 banking day, independently of browser settings.
   const BANK_TIMEZONE = 'Etc/GMT-5';
-  function date(value) { const d = new Date(value); return Number.isNaN(d.getTime()) ? '—' : new Intl.DateTimeFormat(LOCALES[language], {dateStyle:'medium', timeStyle:'short', timeZone:BANK_TIMEZONE}).format(d) + ' (UTC+5)'; }
+  // Some browsers recognize kk-KZ but still return placeholder months like M11.
+  const KAZAKH_MONTHS = ['қаңтар','ақпан','наурыз','сәуір','мамыр','маусым','шілде','тамыз','қыркүйек','қазан','қараша','желтоқсан'];
+  function monthName(value) {
+    const d = new Date(value); if (Number.isNaN(d.getTime())) return '—';
+    if (language === 'kk') { const local = new Date(d.getTime() + 5 * 3600000); return `${local.getUTCFullYear()} ж. ${KAZAKH_MONTHS[local.getUTCMonth()]}`; }
+    return new Intl.DateTimeFormat(LOCALES[language], {month:'long', year:'numeric', timeZone:BANK_TIMEZONE}).format(d);
+  }
+  function date(value) {
+    const d = new Date(value); if (Number.isNaN(d.getTime())) return '—';
+    if (language === 'kk') {
+      const local = new Date(d.getTime() + 5 * 3600000), pad = number => String(number).padStart(2,'0');
+      return `${local.getUTCDate()} ${KAZAKH_MONTHS[local.getUTCMonth()]} ${local.getUTCFullYear()} ж., ${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())} (UTC+5)`;
+    }
+    return new Intl.DateTimeFormat(LOCALES[language], {dateStyle:'medium', timeStyle:'short', timeZone:BANK_TIMEZONE}).format(d) + ' (UTC+5)';
+  }
   function localDay(value) { const d = new Date(value); return Number.isNaN(d.getTime()) ? '' : new Date(d.getTime() + 5 * 3600000).toISOString().slice(0, 10); }
   function statusText(value) { const canonical = String(value || ''); return t('status' + canonical.charAt(0).toUpperCase() + canonical.slice(1).toLowerCase()); }
   function accountLabel(value) { return value === 'Everyday account' ? t('everydayAccount') : value === 'Savings account' ? t('savingsAccount') : value || t('account'); }
@@ -727,21 +741,32 @@
   function messageText(message) { if (typeof message === 'function') return messageText(message()); return message?.key ? t(message.key, message.params) : systemText(message); }
 
   let csrfToken = '', accounts = [], recipients = [], currentId = null, activeRequestId = null, lastTransfer = null, authMode = 'login', limits = {};
-  let historyEntries = [], historyLoaded = false, auditEvents = null, selectedTransferDetails = null, detailRequest = 0, sessionGeneration = 0, refreshing = false;
-  const notices = new Map();
+  let historyEntries = [], historyLoaded = false, historyMarkup = null, auditEvents = null, selectedTransferDetails = null, detailRequest = 0, sessionGeneration = 0, refreshing = false;
+  const notices = new Map(), noticeViews = new WeakMap();
   function renderNotice(el) {
     const state = notices.get(el.id); if (!state) return;
     const kind = typeof state.kind === 'function' ? state.kind() : state.kind;
     const actions = typeof state.actions === 'function' ? state.actions() : state.actions;
-    el.className = 'notice show ' + kind; el.textContent = messageText(state.message);
-    for (const action of actions) { const button = document.createElement('button'); button.type = 'button'; button.className = action.cancel ? 'cancelaction' : 'rowaction'; button.textContent = t(action.key); button.onclick = action.run; el.append(' ', button); }
+    const text = messageText(state.message), labels = actions.map(action => t(action.key));
+    const signature = JSON.stringify([kind, text, actions.map((action, index) => [action.key, !!action.cancel, labels[index]])]);
+    const previous = noticeViews.get(el);
+    // Polling must not detach the button a person is clicking or focusing.
+    if (previous?.signature === signature) { previous.buttons.forEach(({button}, index) => button.onclick = actions[index].run); return; }
+    const focusedKey = previous?.buttons.find(({button}) => button === document.activeElement)?.key;
+    el.className = 'notice show ' + kind; el.textContent = text;
+    const buttons = actions.map((action, index) => {
+      const button = document.createElement('button'); button.type = 'button'; button.className = action.cancel ? 'cancelaction' : 'rowaction'; button.textContent = labels[index]; button.onclick = action.run; el.append(' ', button);
+      return {key:action.key, button};
+    });
+    noticeViews.set(el, {signature, buttons});
+    if (focusedKey) buttons.find(action => action.key === focusedKey)?.button.focus({preventScroll:true});
   }
   function notice(el, message, kind = 'info', actions = []) { notices.set(el.id, {message, kind, actions}); renderNotice(el); }
-  function hideNotice(el) { notices.delete(el.id); el.className = 'notice'; el.textContent = ''; }
+  function hideNotice(el) { notices.delete(el.id); noticeViews.delete(el); el.className = 'notice'; el.textContent = ''; }
   function reportError(el, error) { if (error.name !== 'AbortError') notice(el, error.message, 'error'); }
   function staleRequest() { return new DOMException('The session changed', 'AbortError'); }
   function resetBankState() {
-    sessionGeneration++; detailRequest++; csrfToken = ''; accounts = []; recipients = []; currentId = null; historyEntries = []; historyLoaded = false; auditEvents = null; limits = {}; selectedTransferDetails = null;
+    sessionGeneration++; detailRequest++; csrfToken = ''; accounts = []; recipients = []; currentId = null; historyEntries = []; historyLoaded = false; historyMarkup = null; auditEvents = null; limits = {}; selectedTransferDetails = null;
     clearForNew(); $('detailsBody').textContent = ''; $('historyBody').textContent = ''; $('auditBody').textContent = ''; $('accountSelect').textContent = ''; $('recipient').textContent = ''; $('userEmail').textContent = ''; $('customerName').textContent = '—'; $('balance').textContent = '₸—'; $('accountNumber').textContent = '••••'; $('accountLabel').textContent = t('account');
     if ($('detailsDialog').open) $('detailsDialog').close();
     document.dispatchEvent(new Event('banksessionchange'));
@@ -779,7 +804,10 @@
     $('auditToggle').classList.toggle('hidden', user.email.toLowerCase() !== 'aruzhan@example.test'); $('auditPanel').classList.add('hidden'); $('auditToggle').textContent = t('auditLog');
     setScheduledMinimum(); await Promise.all([loadAccounts(), loadRecipients(), loadLimits()]); document.dispatchEvent(new Event('bankready'));
   }
-  function setScheduledMinimum() { $('scheduledFor').min = new Date(Date.now() + 5 * 3600000 + 60000).toISOString().slice(0, 16); }
+  function setScheduledMinimum() {
+    const firstValidMinute = Math.ceil((Date.now() + 30000) / 60000) * 60000;
+    $('scheduledFor').min = new Date(firstValidMinute + 5 * 3600000).toISOString().slice(0, 16);
+  }
   function renderLimits() { $('limitText').textContent = limits.minimum == null ? t('loadingLimits') : t('limits', {minimum:money(limits.minimum), maximum:money(limits.maximum), daily:money(limits.daily), used:money(limits.usedToday), remaining:money(limits.remainingToday)}); }
   async function loadLimits() { limits = await api('/api/limits'); $('amount').min = limits.minimum.toFixed(2); $('amount').max = limits.maximum.toFixed(2); renderLimits(); }
   async function loadRecipients() { recipients = await api('/api/recipients'); renderRecipients(); }
@@ -793,9 +821,11 @@
     const query = $('historySearch').value.trim().toLocaleLowerCase(LOCALES[language]), status = $('historyStatus').value, from = $('historyFrom').value, to = $('historyTo').value, min = $('historyMin').value, max = $('historyMax').value;
     const filtered = historyEntries.filter(entry => { const searchable = [entry.counterparty, entry.description, entry.requestId].join(' ').toLocaleLowerCase(LOCALES[language]), day = localDay(entry.createdAt), amount = Number(entry.amount); return (!query || searchable.includes(query)) && (!status || entry.status === status) && (!from || day >= from) && (!to || day <= to) && (!min || amount >= Number(min)) && (!max || amount <= Number(max)); });
     $('transferCount').textContent = historyLoaded ? t('transferCount', {filtered:filtered.length, total:historyEntries.length}) : t('latestActivity');
-    if (!historyLoaded || !historyEntries.length || !filtered.length) { $('historyBody').className = 'empty'; $('historyBody').textContent = t(!historyLoaded ? 'loadingActivity' : !historyEntries.length ? 'noTransfers' : 'noMatches'); return; }
+    if (!historyLoaded || !historyEntries.length || !filtered.length) { historyMarkup = null; $('historyBody').className = 'empty'; $('historyBody').textContent = t(!historyLoaded ? 'loadingActivity' : !historyEntries.length ? 'noTransfers' : 'noMatches'); return; }
     $('historyBody').className = '';
-    $('historyBody').innerHTML = `<table class="table"><thead><tr><th>${esc(t('otherAccount'))}</th><th>${esc(t('reference'))}</th><th>${esc(t('status'))}</th><th>${esc(t('amount'))}</th><th></th></tr></thead><tbody>${filtered.map(entry => `<tr><td><button class="rowaction person" data-detail="${esc(entry.requestId)}">${esc(entry.counterparty)}</button><div class="sub">${esc(entry.description || t('transfer'))} · ${esc(date(entry.createdAt))}</div></td><td><button class="rowaction" data-detail="${esc(entry.requestId)}">${esc(entry.requestId)}</button></td><td><span class="pill ${esc(entry.status)}">${esc(statusText(entry.status))}</span></td><td class="money">${entry.direction === 'outgoing' ? '−' : '+'}${esc(money(entry.amount))}</td><td>${entry.status === 'Scheduled' ? `<button class="cancelaction" data-cancel="${esc(entry.requestId)}">${esc(t('cancel'))}</button>` : ''}</td></tr>`).join('')}</tbody></table>`;
+    const markup = `<table class="table"><thead><tr><th>${esc(t('otherAccount'))}</th><th>${esc(t('reference'))}</th><th>${esc(t('status'))}</th><th>${esc(t('amount'))}</th><th></th></tr></thead><tbody>${filtered.map(entry => `<tr><td><button class="rowaction person" data-detail="${esc(entry.requestId)}">${esc(entry.counterparty)}</button><div class="sub">${esc(entry.description || t('transfer'))} · ${esc(date(entry.createdAt))}</div></td><td><button class="rowaction" data-detail="${esc(entry.requestId)}">${esc(entry.requestId)}</button></td><td><span class="pill ${esc(entry.status)}">${esc(statusText(entry.status))}</span></td><td class="money">${entry.direction === 'outgoing' ? '−' : '+'}${esc(money(entry.amount))}</td><td>${entry.status === 'Scheduled' ? `<button class="cancelaction" data-cancel="${esc(entry.requestId)}">${esc(t('cancel'))}</button>` : ''}</td></tr>`).join('')}</tbody></table>`;
+    if (markup === historyMarkup) return;
+    $('historyBody').innerHTML = markup; historyMarkup = markup;
     document.querySelectorAll('[data-detail]').forEach(button => button.onclick = () => showDetails(button.dataset.detail)); document.querySelectorAll('[data-cancel]').forEach(button => button.onclick = () => cancelScheduled(button.dataset.cancel));
   }
   async function loadHistory() {
@@ -818,7 +848,7 @@
     if ((match = text.match(/^Rejected ([\d,.]+) KZT amount (below|above) the (minimum|maximum) limit\.$/))) return t(match[2] === 'below' ? 'auditBelow' : 'auditAbove', {amount:amount(match[1])});
     if ((match = text.match(/^Rejected because the daily limit would be exceeded; ([\d,.]+) KZT remained\.$/))) return t('auditDaily', {amount:amount(match[1])});
     if ((match = text.match(/^Submitted ([\d,.]+) KZT to (.+); current status is Pending\.$/))) return t('auditSent', {amount:amount(match[1]), name:match[2], status:statusText('Pending')});
-    if ((match = text.match(/^Scheduled ([\d,.]+) KZT for (.+?)\. Reminder: ([\s\S]*)\.$/))) return t('auditScheduled', {amount:amount(match[1]), date:match[2], reminder:match[3] === 'No reminder note' ? t('noReminder') : match[3]});
+    if ((match = text.match(/^Scheduled ([\d,.]+) KZT for (.+?)\. Reminder: ([\s\S]*)\.$/))) return t('auditScheduled', {amount:amount(match[1]), date:date(match[2].replace(' UTC+5', '+05:00').replace(' ', 'T')), reminder:match[3] === 'No reminder note' ? t('noReminder') : match[3]});
     if ((match = text.match(/^(.+) changed the account password\. All active sessions were signed out\.$/))) return t('auditPasswordDetails', {name:match[1]});
     if ((match = text.match(/^(.+) account registered\.$/))) return t('auditUserRegistered', {name:match[1]});
     if ((match = text.match(/^(.+) user signed in\.$/))) return t('auditUserIn', {name:match[1]});

@@ -54,12 +54,12 @@ Object.assign(I18N.kk, {
   const visible = () => !bank.classList.contains('hidden');
   const identity = () => document.getElementById('userEmail').textContent;
 
-  function highlight(transfer, title) {
+  function highlight(transfer, title, buttonId) {
     const content = transfer
       ? `<div class="stat-amount">${esc(money(transfer.amount))}</div>
          <div class="stat-person">${esc(transfer.recipient)}</div>
          <div class="stat-hint">${esc(date(transfer.completedAt))}</div>
-         <button type="button" class="rowaction stat-link" data-stat-detail="${esc(transfer.requestId)}">${esc(t('statsDetails'))} ↗</button>`
+         <button type="button" id="${buttonId}" class="rowaction stat-link" data-stat-detail="${esc(transfer.requestId)}">${esc(t('statsDetails'))} ↗</button>`
       : `<p class="stat-empty">${esc(t(data ? 'statsNoTransfers' : 'statsLoading'))}</p>`;
     return `<article class="card stat-highlight"><div class="stat-label">${esc(title)}</div>${content}</article>`;
   }
@@ -68,12 +68,9 @@ Object.assign(I18N.kk, {
     if (!visible()) return;
     const active = panel.contains(document.activeElement) ? document.activeElement : null;
     const focusedId = active?.id;
-    const focusedTransfer = active?.dataset.statDetail;
     const scroll = panel.querySelector('.stat-leaders')?.scrollTop || 0;
     const month = data?.month;
-    const monthName = data ? new Intl.DateTimeFormat(
-      {en: 'en-GB', ru: 'ru-RU', kk: 'kk-KZ'}[document.documentElement.lang] || 'en-GB',
-      {month: 'long', year: 'numeric', timeZone: 'Etc/GMT-5'}).format(new Date(data.asOf)) : t('statsMonthOnly');
+    const periodName = data ? monthName(data.asOf) : t('statsMonthOnly');
     const summary = (period, label, hint, accent) => `<article class="card stat-total ${accent ? 'stat-total-accent' : ''}">
       <div><div class="stat-label">${esc(label)}</div><div class="stat-total-amount">${period ? esc(money(period.totalAmount)) : '—'}</div></div>
       <div class="stat-total-meta"><span>${period ? esc(t('statsCount', {count: period.count})) : esc(t('statsLoading'))}</span><span>${esc(hint)}</span></div>
@@ -82,8 +79,8 @@ Object.assign(I18N.kk, {
       <button type="button" class="stat-refresh" id="refreshAnalytics" aria-label="${esc(t('statsRefresh'))}" title="${esc(t('statsRefresh'))}" ${pending ? 'disabled' : ''}>↻</button></div>
       ${failed ? `<div class="notice error show" role="status">${esc(t('statsError'))}</div>` : ''}
       <div class="stat-totals">${summary(data?.week, t('statsWeek'), t('statsWeekHint'), false)}${summary(month, t('statsMonth'), t('statsMonthHint'), true)}</div>
-      <div class="stat-period"><span>${esc(monthName)}</span><span>${esc(t('statsMonthOnly'))}</span></div>
-      <div class="stat-highlights">${highlight(month?.largest, t('statsLargest'))}${highlight(month?.smallest, t('statsSmallest'))}
+      <div class="stat-period"><span>${esc(periodName)}</span><span>${esc(t('statsMonthOnly'))}</span></div>
+      <div class="stat-highlights">${highlight(month?.largest, t('statsLargest'), 'statLargestDetail')}${highlight(month?.smallest, t('statsSmallest'), 'statSmallestDetail')}
         <article class="card stat-highlight stat-frequent"><div class="stat-label">${esc(t('statsFrequent'))}</div>
           <div class="stat-leaders">${month?.frequentRecipients.length ? month.frequentRecipients.map(recipient => `<div class="stat-leader">
             <span class="stat-initial" aria-hidden="true">${esc(recipient.name.slice(0, 1))}</span>
@@ -94,11 +91,7 @@ Object.assign(I18N.kk, {
         </article>
       </div><div class="stats-foot"><span>${esc(t('statsPrivacy'))}</span>${data ? `<span>${esc(t('statsUpdated', {time: date(data.asOf)}))}</span>` : ''}</div>`;
     panel.querySelector('#refreshAnalytics').onclick = load;
-    if (focusedId === 'refreshAnalytics') panel.querySelector('#refreshAnalytics').focus({preventScroll: true});
-    if (focusedTransfer) {
-      [...panel.querySelectorAll('[data-stat-detail]')].find(button => button.dataset.statDetail === focusedTransfer)
-        ?.focus({preventScroll: true});
-    }
+    if (focusedId) panel.querySelector(`#${focusedId}`)?.focus({preventScroll: true});
     panel.querySelector('.stat-leaders').scrollTop = scroll;
   }
 

@@ -174,6 +174,10 @@ def init_db() -> None:
             db.execute("ALTER TABLE transfers ADD COLUMN scheduled_for TEXT")
         if "completed_at" not in transfer_columns:
             db.execute("ALTER TABLE transfers ADD COLUMN completed_at TEXT")
+        if "risk_score" not in transfer_columns:
+            db.execute("ALTER TABLE transfers ADD COLUMN risk_score INTEGER NOT NULL DEFAULT 0")
+        if "risk_reason" not in transfer_columns:
+            db.execute("ALTER TABLE transfers ADD COLUMN risk_reason TEXT NOT NULL DEFAULT ''")
         user_columns = table_columns(db, "users")
         if "phone_number" not in user_columns:
             db.execute("ALTER TABLE users ADD COLUMN phone_number TEXT")
@@ -261,6 +265,40 @@ def insert_audit(db: sqlite3.Connection, actor_user_id: int | None, action: str,
                  entity_type: str, entity_id: str, details: str) -> None:
     db.execute("INSERT INTO audit_logs(actor_user_id,action,entity_type,entity_id,details,created_at) VALUES(?,?,?,?,?,?)",
                (actor_user_id, action, entity_type, entity_id, details, now()))
+
+
+# Suspicious-transfer detector: statistics and rules only. It flags, never blocks.
+RISK_AVG_MULTIPLIER = 3
+RISK_NEW_RECIPIENT_CENTS = int(os.environ.get("BANK_RISK_NEW_RECIPIENT_KZT", "100000")) * CENT
+RISK_BURST_COUNT = 5
+RISK_BURST_MINUTES = 10
+
+
+def assess_risk(db: sqlite3.Connection, user_id: int, recipient_id: int, cents: int) -> tuple[int, list[str]]:
+    """Score a new transfer (0-100) before it is inserted; returns (score, reasons)."""
+    own = "sender_account_id IN (SELECT id FROM accounts WHERE owner_user_id=?)"
+    score, reasons = 0, []
+
+    average = db.execute(f"SELECT AVG(amount_cents) FROM transfers WHERE {own} AND status<>'Failed'",
+                         (user_id,)).fetchone()[0]
+    if average and cents > RISK_AVG_MULTIPLIER * average:
+        score += 40
+        reasons.append(f"Amount is {cents / average:.1f}x the customer's average of {average / CENT:,.2f} KZT")
+
+    known = db.execute(f"SELECT 1 FROM transfers WHERE {own} AND recipient_account_id=? LIMIT 1",
+                       (user_id, recipient_id)).fetchone()
+    if not known and cents >= RISK_NEW_RECIPIENT_CENTS:
+        score += 35
+        reasons.append(f"Large amount ({cents / CENT:,.2f} KZT) to a new recipient")
+
+    since = (datetime.now(timezone.utc) - timedelta(minutes=RISK_BURST_MINUTES)).isoformat(timespec="seconds")
+    recent = db.execute(f"SELECT COUNT(*) FROM transfers WHERE {own} AND datetime(created_at)>=datetime(?)",
+                        (user_id, since)).fetchone()[0]
+    if recent >= RISK_BURST_COUNT:  # this transfer would be number recent + 1
+        score += 25
+        reasons.append(f"More than {RISK_BURST_COUNT} transfers in {RISK_BURST_MINUTES} minutes")
+
+    return min(score, 100), reasons
 
 
 def parse_scheduled_for(value: str) -> datetime:
@@ -873,13 +911,18 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(400, {"error": f"Daily transfer limit is {DAILY_LIMIT_CENTS / CENT:,.2f} KZT. Remaining today: {remaining:,.2f} KZT"})
                 return
 
+            risk_score, risk_reasons = assess_risk(db, user["user_id"], recipient_id, cents)
             created = now()
             db.execute("""INSERT INTO transfers(request_id,sender_account_id,recipient_account_id,amount_cents,status,
-                created_at,checked_at,failure_reason,description) VALUES(?,?,?,?,?,?,?,?,?)""",
-                       (request_id, sender_id, recipient_id, cents, "Pending", created, created, None, description))
+                created_at,checked_at,failure_reason,description,risk_score,risk_reason) VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+                       (request_id, sender_id, recipient_id, cents, "Pending", created, created, None, description,
+                        risk_score, "; ".join(risk_reasons)))
             row = self.transfer_row(db, request_id)
             insert_audit(db, user["user_id"], "Transfer submitted", "transfer", request_id,
                          f"Submitted {cents / CENT:,.2f} KZT to {row['recipient_name']}; current status is Pending.")
+            if risk_reasons:
+                insert_audit(db, user["user_id"], "Transfer flagged as suspicious", "transfer", request_id,
+                             f"Risk score {risk_score}/100: " + "; ".join(risk_reasons) + ".")
             db.commit()
         schedule_transfer(request_id)
         self.send_json(202, self.transfer_payload(row, [sender_id]))

@@ -30,11 +30,11 @@
         <div class="field"><label for="authPassword" data-i18n="password">Password</label><input id="authPassword" type="password" autocomplete="current-password" required maxlength="128"></div>
         <div class="field hidden" id="confirmField"><label for="authPasswordConfirm" data-i18n="confirmPassword">Confirm password</label><input id="authPasswordConfirm" type="password" autocomplete="new-password" maxlength="128"></div>
         <button class="primary" id="authButton" type="submit" data-i18n="signIn">Sign in</button><button class="rowaction" id="forgotButton" type="button" data-i18n="forgotPassword">Forgot password?</button></form>
-      <form id="passwordResetForm" class="hidden"><div class="field"><label for="resetEmail" data-i18n="accountEmail">Account email</label><input id="resetEmail" type="email" autocomplete="username" required maxlength="254"></div>
-        <div class="field"><label for="oldPassword" data-i18n="oldPassword">Old password</label><input id="oldPassword" type="password" autocomplete="current-password" required maxlength="128"></div>
-        <div class="field"><label for="newPassword" data-i18n="newPassword">New password</label><input id="newPassword" type="password" autocomplete="new-password" minlength="12" required maxlength="128"></div>
+      <form id="passwordResetRequestForm" class="hidden"><div class="field"><label for="resetEmail" data-i18n="accountEmail">Account email</label><input id="resetEmail" type="email" autocomplete="email" required maxlength="254"></div>
+        <button class="primary" id="sendResetButton" type="submit" data-i18n="sendResetLink">Send reset link</button><button class="rowaction" id="backToLogin" type="button" data-i18n="backToSignIn">Back to sign in</button></form>
+      <form id="passwordResetForm" class="hidden"><div class="field"><label for="newPassword" data-i18n="newPassword">New password</label><input id="newPassword" type="password" autocomplete="new-password" minlength="12" required maxlength="128"></div>
         <div class="field"><label for="newPasswordConfirm" data-i18n="confirmNewPassword">Confirm new password</label><input id="newPasswordConfirm" type="password" autocomplete="new-password" minlength="12" required maxlength="128"></div>
-        <button class="primary" id="resetButton" type="submit" data-i18n="updatePassword">Update password</button><button class="rowaction" id="backToLogin" type="button" data-i18n="backToSignIn">Back to sign in</button></form>
+        <button class="primary" id="resetButton" type="submit" data-i18n="setNewPassword">Set new password</button><button class="rowaction" id="backToLoginFromReset" type="button" data-i18n="backToSignIn">Back to sign in</button></form>
       <div class="notice" id="authNotice" role="status" aria-live="polite"></div>
       <div class="demo-login" id="demoLogin"><strong data-i18n="demoSignIn">Demo sign-in</strong><br><span data-i18n="email">Email</span> <code>aruzhan@example.test</code><br><span data-i18n="password">Password</span> <code>DemoPass!23</code></div>
     </section>
@@ -115,6 +115,14 @@
     "backToSignIn": "Back to sign in",
     "changePassword": "Change your password",
     "changePasswordSubtitle": "Enter your email and old password, then choose and confirm a new password.",
+    "passwordResetRequestSubtitle": "Enter your account email to request a password reset link.",
+    "passwordResetSetSubtitle": "Choose a new password for your account.",
+    "sendResetLink": "Send reset link",
+    "setNewPassword": "Set new password",
+    "passwordResetRequestSent": "If an account exists for that email, a password reset link has been sent.",
+    "passwordResetSuccess": "Your password has been reset. Sign in with your new password.",
+    "passwordResetInvalid": "This password reset link is invalid or has expired.",
+    "passwordResetNotConfigured": "Password reset email is not configured on the server.",
     "demoSignIn": "Demo sign-in",
     "personalBanking": "Personal banking",
     "greeting": "Good day,",
@@ -368,6 +376,14 @@
     "backToSignIn": "Вернуться ко входу",
     "changePassword": "Смена пароля",
     "changePasswordSubtitle": "Введите почту и старый пароль, затем задайте и подтвердите новый пароль.",
+    "passwordResetRequestSubtitle": "Введите почту аккаунта, чтобы запросить ссылку для сброса пароля.",
+    "passwordResetSetSubtitle": "Задайте новый пароль для аккаунта.",
+    "sendResetLink": "Отправить ссылку",
+    "setNewPassword": "Задать новый пароль",
+    "passwordResetRequestSent": "Если аккаунт с таким адресом существует, ссылка для сброса пароля отправлена.",
+    "passwordResetSuccess": "Пароль изменён. Войдите с новым паролем.",
+    "passwordResetInvalid": "Ссылка для сброса пароля недействительна или срок её действия истёк.",
+    "passwordResetNotConfigured": "Отправка писем для сброса пароля не настроена на сервере.",
     "demoSignIn": "Данные для демовхода",
     "personalBanking": "Личный кабинет",
     "greeting": "Здравствуйте,",
@@ -621,6 +637,14 @@
     "backToSignIn": "Кіруге оралу",
     "changePassword": "Құпиясөзді өзгерту",
     "changePasswordSubtitle": "Поштаңызды және ескі құпиясөзді енгізіп, жаңа құпиясөзді орнатыңыз және растаңыз.",
+    "passwordResetRequestSubtitle": "Құпиясөзді қалпына келтіру сілтемесін сұрау үшін тіркелгі поштаңызды енгізіңіз.",
+    "passwordResetSetSubtitle": "Тіркелгіңізге жаңа құпиясөз орнатыңыз.",
+    "sendResetLink": "Қалпына келтіру сілтемесін жіберу",
+    "setNewPassword": "Жаңа құпиясөз орнату",
+    "passwordResetRequestSent": "Егер осы поштаға тіркелгі ашылған болса, құпиясөзді қалпына келтіру сілтемесі жіберілді.",
+    "passwordResetSuccess": "Құпиясөз қалпына келтірілді. Жаңа құпиясөзбен кіріңіз.",
+    "passwordResetInvalid": "Құпиясөзді қалпына келтіру сілтемесі жарамсыз немесе мерзімі өткен.",
+    "passwordResetNotConfigured": "Серверде құпиясөзді қалпына келтіру хаттары бапталмаған.",
     "demoSignIn": "Демоға кіру деректері",
     "personalBanking": "Жеке кабинет",
     "greeting": "Сәлеметсіз бе,",
@@ -857,7 +881,7 @@
   function statusText(value) { const canonical = String(value || ''); return t('status' + canonical.charAt(0).toUpperCase() + canonical.slice(1).toLowerCase()); }
   function accountLabel(value) { return value === 'Everyday account' ? t('everydayAccount') : value === 'Savings account' ? t('savingsAccount') : value || t('account'); }
   const msg = (key, params = {}) => ({key, params});
-  const SYSTEM_KEYS = ['positiveAmount','validAmount','validEmail','validSchedule','validDate','requestLarge','invalidRequest','invalidRequestData','signInRequired','tokenExpired','auditDenied','transferNotFound','notFound','scheduledNotFound','invalidReference','descriptionLong','invalidTransfer','differentRecipient','referenceScheduled','referenceMismatch','scheduleFuture','scheduleYear','reminderLong','invalidScheduled','referenceUsed','enterOldPassword','passwordLength','newPasswordLength','passwordMismatch','newPasswordMismatch','passwordDifferent','invalidPassword','wrongOldPassword','nameLength','enterPassword','invalidDetails','emailExists','wrongPassword','insufficientFunds','unavailableAccount','amountBelow','amountAbove','dailyWouldExceed','insufficientScheduled','passwordChanged','noAccount','sessionExpired','requestFailed','phoneInvalid','phoneDuplicate','phoneRecipientNotFound','emailDuplicate','currentPasswordRequired','currentPasswordInvalid','deleteConfirmationRequired','emailReserved'];
+  const SYSTEM_KEYS = ['positiveAmount','validAmount','validEmail','validSchedule','validDate','passwordResetInvalid','passwordResetNotConfigured','requestLarge','invalidRequest','invalidRequestData','signInRequired','tokenExpired','auditDenied','transferNotFound','notFound','scheduledNotFound','invalidReference','descriptionLong','invalidTransfer','differentRecipient','referenceScheduled','referenceMismatch','scheduleFuture','scheduleYear','reminderLong','invalidScheduled','referenceUsed','enterOldPassword','passwordLength','newPasswordLength','passwordMismatch','newPasswordMismatch','passwordDifferent','invalidPassword','wrongOldPassword','nameLength','enterPassword','invalidDetails','emailExists','wrongPassword','insufficientFunds','unavailableAccount','amountBelow','amountAbove','dailyWouldExceed','insufficientScheduled','passwordChanged','noAccount','sessionExpired','requestFailed','phoneInvalid','phoneDuplicate','phoneRecipientNotFound','emailDuplicate','currentPasswordRequired','currentPasswordInvalid','deleteConfirmationRequired','emailReserved'];
   const SYSTEM_MESSAGES = Object.fromEntries(SYSTEM_KEYS.map(key => [I18N.en[key], key]));
   SYSTEM_MESSAGES['Transfer reference is already in use'] = 'referenceUsed';
   SYSTEM_MESSAGES['insufficient funds'] = 'insufficientFunds';
@@ -873,7 +897,7 @@
   }
   function messageText(message) { if (typeof message === 'function') return messageText(message()); return message?.key ? t(message.key, message.params) : systemText(message); }
 
-  let csrfToken = '', accounts = [], recipients = [], currentId = null, activeRequestId = null, lastTransfer = null, authMode = 'login', limits = {}, currentUser = null;
+  let csrfToken = '', accounts = [], recipients = [], currentId = null, activeRequestId = null, lastTransfer = null, authMode = 'login', resetToken = '', limits = {}, currentUser = null;
   let historyEntries = [], historyLoaded = false, historyMarkup = null, auditEvents = null, selectedTransferDetails = null, detailRequest = 0, sessionGeneration = 0, refreshing = false;
   const notices = new Map(), noticeViews = new WeakMap();
   function renderNotice(el) {
@@ -912,24 +936,27 @@
     let data = {}; try { data = await response.json(); } catch {}
     if (generation !== sessionGeneration) throw staleRequest();
     if (!response.ok) {
-    if (response.status === 401 && !['/api/login','/api/register','/api/password/change','/api/profile','/api/account/delete'].includes(url)) { resetBankState(); showAuth('login'); notice($('authNotice'), msg('sessionExpired'), 'error'); throw staleRequest(); }
+    if (response.status === 401 && !['/api/login','/api/register','/api/password/change','/api/password/request-reset','/api/password/reset','/api/profile','/api/account/delete'].includes(url)) { resetBankState(); showAuth('login'); notice($('authNotice'), msg('sessionExpired'), 'error'); throw staleRequest(); }
       throw Error(data.error || I18N.en.requestFailed);
     }
     return data;
   }
   function renderAuthText() {
-    const changing = authMode === 'password-change', registering = authMode === 'register';
-    $('authTitle').textContent = t(changing ? 'changePassword' : registering ? 'registerTitle' : 'welcome');
-    $('authSubtitle').textContent = t(changing ? 'changePasswordSubtitle' : registering ? 'registerSubtitle' : 'loginSubtitle'); $('authButton').textContent = t(registering ? 'createAccount' : 'signIn');
+    const requestingReset = authMode === 'password-reset-request', settingReset = authMode === 'password-reset', registering = authMode === 'register';
+    $('authTitle').textContent = t(requestingReset ? 'changePassword' : settingReset ? 'setNewPassword' : registering ? 'registerTitle' : 'welcome');
+    $('authSubtitle').textContent = t(requestingReset ? 'passwordResetRequestSubtitle' : settingReset ? 'passwordResetSetSubtitle' : registering ? 'registerSubtitle' : 'loginSubtitle'); $('authButton').textContent = t(registering ? 'createAccount' : 'signIn');
   }
   function showAuth(mode = 'login') {
-    authMode = mode; $('authView').classList.remove('hidden'); $('bankView').classList.add('hidden'); $('userBar').classList.add('hidden'); $('authSwitch').classList.remove('hidden'); $('authForm').classList.remove('hidden'); $('passwordResetForm').classList.add('hidden');
+    authMode = mode; resetToken = ''; $('authView').classList.remove('hidden'); $('bankView').classList.add('hidden'); $('userBar').classList.add('hidden'); $('authSwitch').classList.remove('hidden'); $('authForm').classList.remove('hidden'); $('passwordResetRequestForm').classList.add('hidden'); $('passwordResetForm').classList.add('hidden');
     $('demoLogin').classList.toggle('hidden', mode !== 'login'); $('forgotButton').classList.toggle('hidden', mode !== 'login'); $('nameField').classList.toggle('hidden', mode !== 'register'); $('phoneField').classList.toggle('hidden', mode !== 'register'); $('confirmField').classList.toggle('hidden', mode !== 'register'); $('authPhone').disabled = mode !== 'register';
     $('authName').required = mode === 'register'; $('authName').disabled = mode !== 'register'; $('authPassword').autocomplete = mode === 'login' ? 'current-password' : 'new-password'; $('authPassword').minLength = mode === 'register' ? 12 : 0; $('authPasswordConfirm').required = mode === 'register';
     $('loginTab').classList.toggle('active', mode === 'login'); $('registerTab').classList.toggle('active', mode === 'register'); document.querySelectorAll('#authForm input').forEach(localizeValidity); renderAuthText(); hideNotice($('authNotice'));
   }
   function showPasswordChange() {
-    authMode = 'password-change'; $('authSwitch').classList.add('hidden'); $('authForm').classList.add('hidden'); $('passwordResetForm').classList.remove('hidden'); $('demoLogin').classList.add('hidden'); $('resetEmail').value = $('authEmail').value.trim(); document.querySelectorAll('#passwordResetForm input').forEach(localizeValidity); renderAuthText(); hideNotice($('authNotice'));
+    authMode = 'password-reset-request'; $('authSwitch').classList.add('hidden'); $('authForm').classList.add('hidden'); $('passwordResetForm').classList.add('hidden'); $('passwordResetRequestForm').classList.remove('hidden'); $('demoLogin').classList.add('hidden'); $('resetEmail').value = $('authEmail').value.trim(); document.querySelectorAll('#passwordResetRequestForm input').forEach(localizeValidity); renderAuthText(); hideNotice($('authNotice'));
+  }
+  function showResetPassword(token) {
+    resetToken = token; authMode = 'password-reset'; $('authView').classList.remove('hidden'); $('bankView').classList.add('hidden'); $('userBar').classList.add('hidden'); $('authSwitch').classList.add('hidden'); $('authForm').classList.add('hidden'); $('passwordResetRequestForm').classList.add('hidden'); $('passwordResetForm').classList.remove('hidden'); $('demoLogin').classList.add('hidden'); renderAuthText(); document.querySelectorAll('#passwordResetForm input').forEach(localizeValidity); hideNotice($('authNotice'));
   }
   function makeRequestId() { const bytes = new Uint8Array(16); crypto.getRandomValues(bytes); return 'TR-' + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('').toUpperCase(); }
   function syncUserIdentity() { if (!currentUser) return; $('userEmail').textContent = currentUser.email; $('avatar').textContent = (currentUser.name || '?')[0].toUpperCase(); $('customerName').textContent = currentUser.name; $('auditToggle').classList.toggle('hidden', currentUser.role !== 'admin'); }
@@ -1098,14 +1125,20 @@
   $('openDeleteAccount').onclick = () => { $('profileDialog').close(); $('deletePassword').value = ''; $('deleteConfirmation').value = ''; hideNotice($('deleteNotice')); $('deleteAccountDialog').showModal(); };
   $('profileForm').onsubmit = async event => { event.preventDefault(); const button = $('saveProfile'); button.disabled = true; try { const result = await api('/api/profile', {method:'POST', body:JSON.stringify({name:$('profileName').value.trim(), email:$('profileEmail').value.trim(), phone:$('profilePhone').value.trim(), currentPassword:$('profileCurrentPassword').value})}); currentUser = result.user; $('profileCurrentPassword').value = ''; syncUserIdentity(); await loadAccounts(); $('profileDialog').close(); notice($('notice'), msg('profileSaved'), 'success'); } catch (error) { reportError($('profileNotice'), error); } finally { button.disabled = false; } };
   $('deleteAccountForm').onsubmit = async event => { event.preventDefault(); const button = $('confirmDeleteAccount'); button.disabled = true; try { await api('/api/account/delete', {method:'POST', body:JSON.stringify({password:$('deletePassword').value, confirmation:$('deleteConfirmation').value})}); resetBankState(); $('deletePassword').value = ''; $('deleteConfirmation').value = ''; showAuth('login'); notice($('authNotice'), msg('accountDeleted'), 'success'); } catch (error) { reportError($('deleteNotice'), error); } finally { button.disabled = false; } };
-  $('loginTab').onclick = () => showAuth('login'); $('registerTab').onclick = () => showAuth('register'); $('forgotButton').onclick = showPasswordChange; $('backToLogin').onclick = () => showAuth('login');
+  $('loginTab').onclick = () => showAuth('login'); $('registerTab').onclick = () => showAuth('register'); $('forgotButton').onclick = showPasswordChange; $('backToLogin').onclick = () => showAuth('login'); $('backToLoginFromReset').onclick = () => showAuth('login');
   $('authForm').onsubmit = async event => {
     event.preventDefault(); const button = $('authButton'); button.disabled = true;
     try { const body = {email:$('authEmail').value.trim(), password:$('authPassword').value}; if (authMode === 'register') { body.name = $('authName').value.trim(); body.phone = $('authPhone').value.trim(); body.passwordConfirmation = $('authPasswordConfirm').value; } const result = await api('/api/' + (authMode === 'login' ? 'login' : 'register'), {method:'POST', body:JSON.stringify(body)}); csrfToken = result.csrfToken; await openBank(result.user); } catch (error) { reportError($('authNotice'), error); } finally { button.disabled = false; }
   };
+  $('passwordResetRequestForm').onsubmit = async event => {
+    event.preventDefault(); const button = $('sendResetButton'); button.disabled = true;
+    try { await api('/api/password/request-reset', {method:'POST', body:JSON.stringify({email:$('resetEmail').value.trim(), language})}); notice($('authNotice'), msg('passwordResetRequestSent'), 'success'); }
+    catch (error) { reportError($('authNotice'), error); } finally { button.disabled = false; }
+  };
   $('passwordResetForm').onsubmit = async event => {
-    event.preventDefault(); const button = $('resetButton'), email = $('resetEmail').value.trim(); button.disabled = true;
-    try { await api('/api/password/change', {method:'POST', body:JSON.stringify({email, oldPassword:$('oldPassword').value, newPassword:$('newPassword').value, passwordConfirmation:$('newPasswordConfirm').value})}); $('oldPassword').value = ''; $('newPassword').value = ''; $('newPasswordConfirm').value = ''; showAuth('login'); $('authEmail').value = email; notice($('authNotice'), msg('passwordChanged'), 'success'); } catch (error) { reportError($('authNotice'), error); } finally { button.disabled = false; }
+    event.preventDefault(); const button = $('resetButton'); button.disabled = true;
+    try { await api('/api/password/reset', {method:'POST', body:JSON.stringify({token:resetToken, newPassword:$('newPassword').value, passwordConfirmation:$('newPasswordConfirm').value})}); resetToken = ''; $('newPassword').value = ''; $('newPasswordConfirm').value = ''; window.history.replaceState(null, '', window.location.pathname); showAuth('login'); notice($('authNotice'), msg('passwordResetSuccess'), 'success'); }
+    catch (error) { reportError($('authNotice'), error); } finally { button.disabled = false; }
   };
   $('logoutButton').onclick = async () => { const request = api('/api/logout', {method:'POST', body:'{}'}); resetBankState(); showAuth('login'); $('authButton').disabled = true; try { await request; } catch {} finally { $('authButton').disabled = false; } };
   $('auditToggle').onclick = async () => { const panel = $('auditPanel'), opening = panel.classList.contains('hidden'); panel.classList.toggle('hidden', !opening); $('auditToggle').textContent = t(opening ? 'hideAuditLog' : 'auditLog'); if (opening) { try { await loadAudit(); } catch (error) { reportError($('notice'), error); } } };
@@ -1151,7 +1184,7 @@
   document.addEventListener('languagechange', () => localizedDatePicker.refresh());
   setInterval(async () => { if (refreshing || $('bankView').classList.contains('hidden')) return; refreshing = true; try { await Promise.all([loadAccounts(), loadLimits()]); if (!$('auditPanel').classList.contains('hidden')) await loadAudit(); document.dispatchEvent(new Event('bankrefresh')); } catch {} finally { refreshing = false; } }, 2000);
   applyLanguage(); setScheduledMinimum();
-  (async () => { try { const session = await api('/api/session'); if (session.authenticated) { csrfToken = session.csrfToken; await openBank(session.user); } else showAuth('login'); } catch (error) { if (error.name !== 'AbortError') { showAuth('login'); reportError($('authNotice'), error); } } })();
+  (async () => { const token = new URLSearchParams(window.location.search).get('reset_token'); if (token) { showResetPassword(token); return; } try { const session = await api('/api/session'); if (session.authenticated) { csrfToken = session.csrfToken; await openBank(session.user); } else showAuth('login'); } catch (error) { if (error.name !== 'AbortError') { showAuth('login'); reportError($('authNotice'), error); } } })();
 </script>
 <script src="/analytics.js"></script>
 </body></html>

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import html
 import hashlib
 import hmac
 import json
@@ -8,10 +9,14 @@ import os
 import re
 import secrets
 import sqlite3
+import smtplib
+import ssl
 import threading
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
+from email.message import EmailMessage
+from email.utils import formataddr
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -32,6 +37,65 @@ SCHEDULE_MIN_SECONDS = 30
 SCHEDULE_MAX_DAYS = 365
 KZ_TIMEZONE = timezone(timedelta(hours=5))
 DB_LOCK = threading.Lock()
+PASSWORD_RESET_TTL_SECONDS = 30 * 60
+PASSWORD_RESET_RATE_LIMIT = 5
+PASSWORD_RESET_RATE_KEY = os.environ.get("BANK_RESET_RATE_KEY", "").encode() or secrets.token_bytes(32)
+
+
+def password_reset_mail_config() -> dict | None:
+    host = os.environ.get("BANK_SMTP_HOST", "").strip()
+    sender = os.environ.get("BANK_SMTP_FROM", "").strip()
+    public_url = os.environ.get("BANK_PUBLIC_URL", "").strip().rstrip("/")
+    username = os.environ.get("BANK_SMTP_USERNAME", "").strip()
+    password = os.environ.get("BANK_SMTP_PASSWORD", "")
+    if not host or not sender or not public_url or bool(username) != bool(password):
+        return None
+    try:
+        port = int(os.environ.get("BANK_SMTP_PORT", "587"))
+    except ValueError:
+        return None
+    parsed = urlparse(public_url)
+    if port < 1 or port > 65535 or parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return None
+    return {"host": host, "port": port, "sender": sender, "publicUrl": public_url,
+            "username": username, "password": password, "tls": "ssl" if port == 465 else "starttls"}
+
+
+def send_password_reset_email(config: dict, recipient: str, display_name: str, link: str, language: str) -> None:
+    messages = {
+        "en": ("Reset your Northstar Bank demo password", "Hello {name},", "Use the link below to choose a new password:",
+               "This link expires in 30 minutes and can only be used once.", "If you did not request this, you can ignore this email."),
+        "ru": ("Сброс пароля демоверсии Northstar Bank", "Здравствуйте, {name}!", "Перейдите по ссылке ниже, чтобы задать новый пароль:",
+               "Ссылка действует 30 минут и может быть использована только один раз.", "Если вы не запрашивали сброс пароля, просто проигнорируйте это письмо."),
+        "kk": ("Northstar Bank демо нұсқасының құпиясөзін қалпына келтіру", "Сәлеметсіз бе, {name}!", "Жаңа құпиясөз орнату үшін төмендегі сілтемені ашыңыз:",
+               "Сілтеме 30 минут жарамды және оны бір рет қана пайдалануға болады.", "Егер сұрауды сіз жібермесеңіз, бұл хатты елемеуге болады."),
+    }
+    subject, greeting, instruction, expiry, ignore = messages.get(language, messages["en"])
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = formataddr(("Northstar Bank", config["sender"]))
+    message["To"] = recipient
+    safe_greeting = greeting.format(name=display_name or "")
+    message.set_content(f"{safe_greeting}\n\n{instruction}\n{link}\n\n{expiry}\n\n{ignore}\n")
+    message.add_alternative(
+        "<!doctype html><html><body style='font:16px/1.5 system-ui,sans-serif;color:#152923'>"
+        f"<p>{html.escape(safe_greeting)}</p><p>{html.escape(instruction)}</p>"
+        f"<p><a href='{html.escape(link, quote=True)}'>{html.escape(link)}</a></p>"
+        f"<p>{html.escape(expiry)}</p><p>{html.escape(ignore)}</p></body></html>", subtype="html")
+    context = ssl.create_default_context()
+    if config["tls"] == "ssl":
+        with smtplib.SMTP_SSL(config["host"], config["port"], timeout=15, context=context) as server:
+            if config["username"]:
+                server.login(config["username"], config["password"])
+            server.send_message(message)
+    else:
+        with smtplib.SMTP(config["host"], config["port"], timeout=15) as server:
+            server.ehlo()
+            server.starttls(context=context)
+            server.ehlo()
+            if config["username"]:
+                server.login(config["username"], config["password"])
+            server.send_message(message)
 
 
 def now() -> str:
@@ -156,11 +220,28 @@ def init_db() -> None:
             csrf_token TEXT NOT NULL,
             expires_at INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token_hash TEXT NOT NULL UNIQUE,
+            created_at INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL,
+            used_at INTEGER
+        );
+        CREATE TABLE IF NOT EXISTS password_reset_attempts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email_key TEXT NOT NULL,
+            ip_key TEXT NOT NULL,
+            requested_at INTEGER NOT NULL
+        );
         CREATE INDEX IF NOT EXISTS transfers_sender_created ON transfers(sender_account_id, created_at DESC);
         CREATE INDEX IF NOT EXISTS transfers_recipient_created ON transfers(recipient_account_id, created_at DESC);
         CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires_at);
         CREATE INDEX IF NOT EXISTS scheduled_due ON scheduled_transfers(status,scheduled_for);
         CREATE INDEX IF NOT EXISTS audit_by_actor ON audit_logs(actor_user_id,created_at DESC);
+        CREATE INDEX IF NOT EXISTS password_reset_by_user ON password_reset_tokens(user_id,expires_at);
+        CREATE INDEX IF NOT EXISTS password_reset_attempt_email ON password_reset_attempts(email_key,requested_at);
+        CREATE INDEX IF NOT EXISTS password_reset_attempt_ip ON password_reset_attempts(ip_key,requested_at);
         """)
 
         # Upgrade databases created by the earlier demo without discarding account or transfer data.
@@ -777,6 +858,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = urlparse(self.path).path
+        if path == "/api/password/request-reset":
+            self.request_password_reset()
+            return
+        if path == "/api/password/reset":
+            self.reset_password_with_token()
+            return
         if path == "/api/password/change":
             self.change_password()
             return
@@ -1103,6 +1190,103 @@ class Handler(BaseHTTPRequestHandler):
             db.commit()
         self.send_json(200, {"ok": True, "message": "Account deleted"},
                        [("Set-Cookie", "bank_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0")])
+
+    def request_password_reset(self) -> None:
+        config = password_reset_mail_config()
+        if not config:
+            self.send_json(503, {"error": "Password reset email is not configured on the server"})
+            return
+        try:
+            payload = self.read_json()
+            email = str(payload.get("email", "")).strip().lower()
+            language = str(payload.get("language", "en"))
+            if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email) or len(email) > 254:
+                raise ValueError("Enter a valid email address")
+            if language not in ("en", "ru", "kk"):
+                language = "en"
+        except (ValueError, TypeError) as exc:
+            self.send_json(400, {"error": str(exc) or "Invalid request"})
+            return
+
+        current_time = int(datetime.now(timezone.utc).timestamp())
+        email_key = hmac.new(PASSWORD_RESET_RATE_KEY, b"email:" + email.encode(), hashlib.sha256).hexdigest()
+        remote_ip = str(self.client_address[0])
+        ip_key = hmac.new(PASSWORD_RESET_RATE_KEY, b"ip:" + remote_ip.encode(), hashlib.sha256).hexdigest()
+        delivery = None
+        with DB_LOCK, connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute("DELETE FROM password_reset_attempts WHERE requested_at<?", (current_time - 3600,))
+            email_count = db.execute("SELECT COUNT(*) FROM password_reset_attempts WHERE email_key=? AND requested_at>=?",
+                                     (email_key, current_time - 3600)).fetchone()[0]
+            ip_count = db.execute("SELECT COUNT(*) FROM password_reset_attempts WHERE ip_key=? AND requested_at>=?",
+                                  (ip_key, current_time - 3600)).fetchone()[0]
+            generic = {"ok": True, "message": "If an account exists for that email, a password reset link has been sent."}
+            if email_count >= PASSWORD_RESET_RATE_LIMIT or ip_count >= PASSWORD_RESET_RATE_LIMIT:
+                db.commit()
+                self.send_json(200, generic)
+                return
+            db.execute("INSERT INTO password_reset_attempts(email_key,ip_key,requested_at) VALUES(?,?,?)",
+                       (email_key, ip_key, current_time))
+            user = db.execute("SELECT id,full_name,email FROM users WHERE email=? COLLATE NOCASE", (email,)).fetchone()
+            if user:
+                db.execute("DELETE FROM password_reset_tokens WHERE user_id=?", (user["id"],))
+                raw_token = secrets.token_urlsafe(32)
+                token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+                expires_at = current_time + PASSWORD_RESET_TTL_SECONDS
+                db.execute("INSERT INTO password_reset_tokens(user_id,token_hash,created_at,expires_at) VALUES(?,?,?,?)",
+                           (user["id"], token_hash, current_time, expires_at))
+                link = f"{config['publicUrl']}/?reset_token={raw_token}"
+                delivery = (user["email"], user["full_name"], link, language, config)
+            db.commit()
+
+        if delivery:
+            threading.Thread(target=self.deliver_password_reset_email, args=delivery, daemon=True).start()
+        self.send_json(200, generic)
+
+    @staticmethod
+    def deliver_password_reset_email(recipient: str, display_name: str, link: str, language: str, config: dict) -> None:
+        try:
+            send_password_reset_email(config, recipient, display_name, link, language)
+        except (OSError, smtplib.SMTPException, ssl.SSLError) as exc:
+            print(f"Could not deliver password reset email: {type(exc).__name__}")
+
+    def reset_password_with_token(self) -> None:
+        try:
+            payload = self.read_json()
+            token = str(payload.get("token", ""))
+            new_password = str(payload.get("newPassword", ""))
+            confirmation = str(payload.get("passwordConfirmation", ""))
+            if not re.fullmatch(r"[A-Za-z0-9_-]{40,64}", token):
+                raise ValueError("This password reset link is invalid or has expired")
+            if len(new_password) < 12 or len(new_password) > 128:
+                raise ValueError("New password must be 12–128 characters")
+            if new_password != confirmation:
+                raise ValueError("New passwords do not match")
+        except (ValueError, TypeError) as exc:
+            self.send_json(400, {"error": str(exc) or "Invalid reset request"})
+            return
+
+        current_time = int(datetime.now(timezone.utc).timestamp())
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        with DB_LOCK, connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            reset = db.execute("""SELECT t.id,t.user_id,u.full_name FROM password_reset_tokens t
+                JOIN users u ON u.id=t.user_id
+                WHERE t.token_hash=? AND t.used_at IS NULL AND t.expires_at>?""",
+                               (token_hash, current_time)).fetchone()
+            if not reset:
+                db.rollback()
+                self.send_json(400, {"error": "This password reset link is invalid or has expired"})
+                return
+            db.execute("UPDATE users SET password_hash=? WHERE id=?",
+                       (password_hash(new_password), reset["user_id"]))
+            db.execute("UPDATE password_reset_tokens SET used_at=? WHERE id=?", (current_time, reset["id"]))
+            db.execute("DELETE FROM password_reset_tokens WHERE user_id=? AND id<>?", (reset["user_id"], reset["id"]))
+            db.execute("DELETE FROM sessions WHERE user_id=?", (reset["user_id"],))
+            insert_audit(db, reset["user_id"], "Password reset", "user", str(reset["user_id"]),
+                         f"{reset['full_name']} reset the account password using an email link. All active sessions were signed out.")
+            db.commit()
+        self.send_json(200, {"ok": True})
 
     def change_password(self) -> None:
         try:

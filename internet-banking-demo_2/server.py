@@ -71,6 +71,22 @@ def verify_password(password: str, stored: str) -> bool:
         return False
 
 
+def normalize_phone(value) -> str | None:
+    """Return a canonical Kazakhstan phone (+7 followed by ten digits)."""
+    if value is None or value == "":
+        return None
+    if not isinstance(value, str) or len(value) > 32 or not re.fullmatch(r"\+?[0-9()\s.-]+", value):
+        raise ValueError("Enter a valid Kazakhstan phone number")
+    digits = re.sub(r"[^0-9]", "", value)
+    if len(digits) == 10:
+        digits = "7" + digits
+    elif len(digits) == 11 and digits.startswith("8"):
+        digits = "7" + digits[1:]
+    if len(digits) != 11 or not digits.startswith("7"):
+        raise ValueError("Enter a valid Kazakhstan phone number")
+    return "+" + digits
+
+
 def table_columns(db: sqlite3.Connection, table: str) -> set[str]:
     return {row["name"] for row in db.execute(f"PRAGMA table_info({table})")}
 
@@ -85,6 +101,7 @@ def init_db() -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             full_name TEXT NOT NULL,
             email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+            phone_number TEXT,
             password_hash TEXT NOT NULL,
             role TEXT NOT NULL DEFAULT 'customer' CHECK(role IN ('customer','admin')),
             created_at TEXT NOT NULL
@@ -132,6 +149,7 @@ def init_db() -> None:
             details TEXT NOT NULL,
             created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS sessions (
             session_id TEXT PRIMARY KEY,
             user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -156,6 +174,10 @@ def init_db() -> None:
             db.execute("ALTER TABLE transfers ADD COLUMN scheduled_for TEXT")
         if "completed_at" not in transfer_columns:
             db.execute("ALTER TABLE transfers ADD COLUMN completed_at TEXT")
+        user_columns = table_columns(db, "users")
+        if "phone_number" not in user_columns:
+            db.execute("ALTER TABLE users ADD COLUMN phone_number TEXT")
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_phone_unique ON users(phone_number) WHERE phone_number IS NOT NULL")
 
         # Old checked_at values were overwritten when receipts were viewed. Recover
         # completion from a success audit or a matching completed schedule instead.
@@ -178,7 +200,8 @@ def init_db() -> None:
             WHERE status='Completed' AND completed_at IS NULL""")
         db.execute("CREATE INDEX IF NOT EXISTS transfers_sender_completed ON transfers(sender_account_id,completed_at)")
 
-        seed_sample_accounts = db.execute("SELECT COUNT(*) FROM customers").fetchone()[0] == 0
+        sample_seeded = db.execute("SELECT 1 FROM app_meta WHERE key='sample_accounts_seeded'").fetchone()
+        seed_sample_accounts = db.execute("SELECT COUNT(*) FROM customers").fetchone()[0] == 0 and not sample_seeded
         if seed_sample_accounts:
             db.executemany("INSERT INTO customers(id,name,account_number) VALUES(?,?,?)", [
                 (1, "Aruzhan S.", "KZ•• 1042"), (2, "Dias T.", "KZ•• 8821"), (3, "Amina K.", "KZ•• 3307")
@@ -188,6 +211,7 @@ def init_db() -> None:
                 (2, 2, "Everyday account", 2_500_000),
                 (3, 3, "Savings account", 7_500_000)
             ])
+        db.execute("INSERT OR IGNORE INTO app_meta(key,value) VALUES('sample_accounts_seeded','true')")
 
         # Give the three original sample customers persistent local-demo sign-in credentials.
         demo_users = {
@@ -197,6 +221,10 @@ def init_db() -> None:
         }
         for customer in db.execute("SELECT id,name FROM customers").fetchall():
             cid = customer["id"]
+            linked_user = db.execute("SELECT owner_user_id FROM accounts WHERE customer_id=? AND owner_user_id IS NOT NULL LIMIT 1",
+                                     (cid,)).fetchone()
+            if linked_user:
+                continue
             display, email, demo_password = demo_users.get(
                 cid, (customer["name"], f"demo{cid}@example.test", "DemoPass!23")
             )
@@ -205,6 +233,7 @@ def init_db() -> None:
                            (display, email, password_hash(demo_password), "customer", now()))
             user_id = db.execute("SELECT id FROM users WHERE email=? COLLATE NOCASE", (email,)).fetchone()[0]
             db.execute("UPDATE accounts SET owner_user_id=? WHERE customer_id=? AND owner_user_id IS NULL", (user_id, cid))
+        db.execute("UPDATE users SET role='admin' WHERE email='aruzhan@example.test' COLLATE NOCASE")
 
         if seed_sample_accounts and db.execute("SELECT COUNT(*) FROM transfers").fetchone()[0] == 0:
             timestamp = now()
@@ -515,7 +544,7 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             return None
         with connect() as db:
-            row = db.execute("""SELECT s.session_id,s.user_id,s.csrf_token,u.full_name,u.email,u.role
+            row = db.execute("""SELECT s.session_id,s.user_id,s.csrf_token,u.full_name,u.email,u.phone_number,u.role
                 FROM sessions s JOIN users u ON u.id=s.user_id
                 WHERE s.session_id=? AND s.expires_at>?""",
                 (sid, int(datetime.now(timezone.utc).timestamp()))).fetchone()
@@ -537,8 +566,6 @@ class Handler(BaseHTTPRequestHandler):
             "/": ("index.html", "text/html; charset=utf-8"),
             "/analytics.js": ("analytics.js", "text/javascript; charset=utf-8"),
             "/analytics.css": ("analytics.css", "text/css; charset=utf-8"),
-            "/date-picker.js": ("date-picker.js", "text/javascript; charset=utf-8"),
-            "/date-picker.css": ("date-picker.css", "text/css; charset=utf-8"),
         }
         if path in public_files:
             filename, content_type = public_files[path]
@@ -557,10 +584,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(200, {"authenticated": False})
             else:
                 self.send_json(200, {"authenticated": True, "csrfToken": user["csrf_token"],
-                                     "user": {"name": user["full_name"], "email": user["email"]}})
+                                     "user": {"name": user["full_name"], "email": user["email"], "phone": user["phone_number"], "role": user["role"]}})
             return
         user = self.require_user()
         if not user:
+            return
+        if path == "/api/profile":
+            self.send_json(200, {"name": user["full_name"], "email": user["email"], "phone": user["phone_number"], "role": user["role"]})
             return
         if path == "/api/analytics":
             self.send_json(200, transfer_analytics(user["user_id"]))
@@ -594,7 +624,7 @@ class Handler(BaseHTTPRequestHandler):
                                  "remainingToday": max(DAILY_LIMIT_CENTS - used, 0) / CENT})
             return
         if path == "/api/audit-logs":
-            if user["email"].strip().lower() != "aruzhan@example.test":
+            if user["role"] != "admin":
                 self.send_json(403, {"error": "Audit log access is limited to aruzhan@example.test"})
                 return
             with connect() as db:
@@ -726,6 +756,12 @@ class Handler(BaseHTTPRequestHandler):
         user = self.require_user(csrf=True)
         if not user:
             return
+        if path == "/api/profile":
+            self.update_profile(user)
+            return
+        if path == "/api/account/delete":
+            self.delete_account(user)
+            return
         if path == "/api/next-id":
             self.send_json(200, {"requestId": "TR-" + secrets.token_hex(16).upper()})
             return
@@ -765,7 +801,8 @@ class Handler(BaseHTTPRequestHandler):
             if not re.fullmatch(r"TR-[A-F0-9]{32}", request_id):
                 raise ValueError("Transfer reference is invalid. Please start a new transfer")
             sender_id = account_id_from(payload.get("fromAccountId", 0))
-            recipient_id = account_id_from(payload.get("toAccountId", 0))
+            recipient_phone = normalize_phone(payload.get("recipientPhone"))
+            recipient_id = None if recipient_phone else account_id_from(payload.get("toAccountId", 0))
             cents = cents_from(payload.get("amount", 0))
             description = str(payload.get("description", "")).strip()
             if len(description) > 200:
@@ -777,10 +814,17 @@ class Handler(BaseHTTPRequestHandler):
         with DB_LOCK, connect() as db:
             db.execute("BEGIN IMMEDIATE")
             sender = db.execute("SELECT * FROM accounts WHERE id=? AND owner_user_id=?", (sender_id, user["user_id"])).fetchone()
-            recipient = db.execute("SELECT * FROM accounts WHERE id=?", (recipient_id,)).fetchone()
+            if recipient_phone:
+                recipient = db.execute("""SELECT a.* FROM users u JOIN accounts a ON a.owner_user_id=u.id
+                    WHERE u.phone_number=? AND u.id<>? ORDER BY a.id LIMIT 1""",
+                                       (recipient_phone, user["user_id"])).fetchone()
+                recipient_id = recipient["id"] if recipient else None
+            else:
+                recipient = db.execute("SELECT * FROM accounts WHERE id=?", (recipient_id,)).fetchone()
             if not sender or not recipient or sender_id == recipient_id:
                 db.rollback()
-                self.send_json(400, {"error": "Choose one of your accounts and a different recipient"})
+                message = "No account was found for this phone number" if recipient_phone and not recipient else "Choose one of your accounts and a different recipient"
+                self.send_json(400, {"error": message})
                 return
 
             if db.execute("SELECT 1 FROM scheduled_transfers WHERE request_id=?", (request_id,)).fetchone():
@@ -847,7 +891,8 @@ class Handler(BaseHTTPRequestHandler):
             if not re.fullmatch(r"TR-[A-F0-9]{32}", request_id):
                 raise ValueError("Transfer reference is invalid. Please start a new transfer")
             sender_id = account_id_from(payload.get("fromAccountId", 0))
-            recipient_id = account_id_from(payload.get("toAccountId", 0))
+            recipient_phone = normalize_phone(payload.get("recipientPhone"))
+            recipient_id = None if recipient_phone else account_id_from(payload.get("toAccountId", 0))
             cents = cents_from(payload.get("amount", 0))
             reminder = str(payload.get("reminderNote", "")).strip()
             due = parse_scheduled_for(str(payload.get("scheduledFor", "")))
@@ -873,12 +918,19 @@ class Handler(BaseHTTPRequestHandler):
             db.execute("BEGIN IMMEDIATE")
             sender = db.execute("SELECT id FROM accounts WHERE id=? AND owner_user_id=?",
                                 (sender_id, user["user_id"])).fetchone()
-            recipient = db.execute("SELECT id FROM accounts WHERE id=?", (recipient_id,)).fetchone()
+            if recipient_phone:
+                recipient = db.execute("""SELECT a.id FROM users u JOIN accounts a ON a.owner_user_id=u.id
+                    WHERE u.phone_number=? AND u.id<>? ORDER BY a.id LIMIT 1""",
+                                       (recipient_phone, user["user_id"])).fetchone()
+                recipient_id = recipient["id"] if recipient else None
+            else:
+                recipient = db.execute("SELECT id FROM accounts WHERE id=?", (recipient_id,)).fetchone()
             used = db.execute("SELECT 1 FROM transfers WHERE request_id=? UNION SELECT 1 FROM scheduled_transfers WHERE request_id=?",
                               (request_id, request_id)).fetchone()
             if not sender or not recipient or sender_id == recipient_id:
                 db.rollback()
-                self.send_json(400, {"error": "Choose one of your accounts and a different recipient"})
+                message = "No account was found for this phone number" if recipient_phone and not recipient else "Choose one of your accounts and a different recipient"
+                self.send_json(400, {"error": message})
                 return
             if used:
                 db.rollback()
@@ -897,6 +949,115 @@ class Handler(BaseHTTPRequestHandler):
             db.commit()
         schedule_scheduled_transfer(request_id, due_text)
         self.send_json(201, self.scheduled_payload(result))
+
+    def update_profile(self, session_user: sqlite3.Row) -> None:
+        try:
+            payload = self.read_json()
+            name = str(payload.get("name", "")).strip()
+            email = str(payload.get("email", "")).strip().lower()
+            phone = normalize_phone(payload.get("phone"))
+            current_password = str(payload.get("currentPassword", ""))
+            if not 2 <= len(name) <= 80:
+                raise ValueError("Name must be between 2 and 80 characters")
+            if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email) or len(email) > 254:
+                raise ValueError("Enter a valid email address")
+            if not current_password or len(current_password) > 128:
+                raise ValueError("Enter your current password")
+        except (ValueError, TypeError) as exc:
+            self.send_json(400, {"error": str(exc) or "Invalid profile details"})
+            return
+
+        with DB_LOCK, connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            current = db.execute("SELECT * FROM users WHERE id=?", (session_user["user_id"],)).fetchone()
+            if not current or not verify_password(current_password, current["password_hash"]):
+                db.rollback()
+                self.send_json(401, {"error": "Current password is incorrect"})
+                return
+            if db.execute("SELECT 1 FROM users WHERE email=? COLLATE NOCASE AND id<>?", (email, current["id"])).fetchone():
+                db.rollback()
+                self.send_json(409, {"error": "An account already uses this email address"})
+                return
+            if email == "aruzhan@example.test" and current["role"] != "admin":
+                db.rollback()
+                self.send_json(409, {"error": "This email address is reserved for the audit-log account."})
+                return
+            if phone and db.execute("SELECT 1 FROM users WHERE phone_number=? AND id<>?", (phone, current["id"])).fetchone():
+                db.rollback()
+                self.send_json(409, {"error": "This phone number is already linked to another account"})
+                return
+            changes = []
+            if current["full_name"] != name: changes.append("name")
+            if current["email"].lower() != email: changes.append("email")
+            if current["phone_number"] != phone: changes.append("phone number")
+            db.execute("UPDATE users SET full_name=?,email=?,phone_number=? WHERE id=?",
+                       (name, email, phone, current["id"]))
+            db.execute("UPDATE customers SET name=? WHERE id IN (SELECT customer_id FROM accounts WHERE owner_user_id=?)",
+                       (name, current["id"]))
+            if changes:
+                insert_audit(db, current["id"], "Profile updated", "user", str(current["id"]),
+                             "Updated personal information: " + ", ".join(changes) + ".")
+            db.commit()
+        self.send_json(200, {"ok": True, "user": {"name": name, "email": email, "phone": phone, "role": current["role"]}})
+
+    def delete_account(self, session_user: sqlite3.Row) -> None:
+        try:
+            payload = self.read_json()
+            password = str(payload.get("password", ""))
+            confirmation = str(payload.get("confirmation", ""))
+            if not password or len(password) > 128:
+                raise ValueError("Enter your current password")
+            if confirmation != "DELETE":
+                raise ValueError("Type DELETE to confirm account deletion")
+        except (ValueError, TypeError) as exc:
+            self.send_json(400, {"error": str(exc) or "Invalid deletion request"})
+            return
+
+        with DB_LOCK, connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            current = db.execute("SELECT * FROM users WHERE id=?", (session_user["user_id"],)).fetchone()
+            if not current or not verify_password(password, current["password_hash"]):
+                db.rollback()
+                self.send_json(401, {"error": "Current password is incorrect"})
+                return
+            accounts = db.execute("SELECT id,customer_id FROM accounts WHERE owner_user_id=?", (current["id"],)).fetchall()
+            account_ids = [row["id"] for row in accounts]
+            customer_ids = {row["customer_id"] for row in accounts}
+            transfer_refs = []
+            schedule_refs = [row[0] for row in db.execute("SELECT request_id FROM scheduled_transfers WHERE user_id=?", (current["id"],))]
+            if account_ids:
+                marks = ",".join("?" for _ in account_ids)
+                transfer_refs = [row[0] for row in db.execute(
+                    f"SELECT request_id FROM transfers WHERE sender_account_id IN ({marks}) OR recipient_account_id IN ({marks})",
+                    (*account_ids, *account_ids))]
+                schedule_refs = list(set(schedule_refs + [row[0] for row in db.execute(
+                    f"SELECT request_id FROM scheduled_transfers WHERE sender_account_id IN ({marks}) OR recipient_account_id IN ({marks})",
+                    (*account_ids, *account_ids))]))
+            db.execute("DELETE FROM scheduled_transfers WHERE user_id=?", (current["id"],))
+            if account_ids:
+                marks = ",".join("?" for _ in account_ids)
+                db.execute(f"DELETE FROM scheduled_transfers WHERE sender_account_id IN ({marks}) OR recipient_account_id IN ({marks})",
+                           (*account_ids, *account_ids))
+                db.execute(f"DELETE FROM transfers WHERE sender_account_id IN ({marks}) OR recipient_account_id IN ({marks})",
+                           (*account_ids, *account_ids))
+            if schedule_refs:
+                marks = ",".join("?" for _ in schedule_refs)
+                db.execute(f"DELETE FROM audit_logs WHERE entity_type='scheduled_transfer' AND entity_id IN ({marks})", tuple(schedule_refs))
+            if transfer_refs:
+                marks = ",".join("?" for _ in transfer_refs)
+                db.execute(f"DELETE FROM audit_logs WHERE entity_type='transfer' AND entity_id IN ({marks})", tuple(transfer_refs))
+            db.execute("DELETE FROM audit_logs WHERE actor_user_id=?", (current["id"],))
+            db.execute("DELETE FROM sessions WHERE user_id=?", (current["id"],))
+            if account_ids:
+                marks = ",".join("?" for _ in account_ids)
+                db.execute(f"DELETE FROM accounts WHERE id IN ({marks})", tuple(account_ids))
+            for customer_id in customer_ids:
+                db.execute("DELETE FROM customers WHERE id=? AND NOT EXISTS (SELECT 1 FROM accounts WHERE customer_id=?)",
+                           (customer_id, customer_id))
+            db.execute("DELETE FROM users WHERE id=?", (current["id"],))
+            db.commit()
+        self.send_json(200, {"ok": True, "message": "Account deleted"},
+                       [("Set-Cookie", "bank_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0")])
 
     def change_password(self) -> None:
         try:
@@ -919,7 +1080,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(400, {"error": str(exc) or "Invalid password details"})
             return
 
-        with connect() as db:
+        with DB_LOCK, connect() as db:
             db.execute("BEGIN IMMEDIATE")
             user = db.execute("SELECT id,full_name,password_hash FROM users WHERE email=? COLLATE NOCASE", (email,)).fetchone()
             if not user or not verify_password(old_password, user["password_hash"]):
@@ -938,6 +1099,7 @@ class Handler(BaseHTTPRequestHandler):
             payload = self.read_json()
             email = str(payload.get("email", "")).strip().lower()
             password = str(payload.get("password", ""))
+            phone = normalize_phone(payload.get("phone")) if path == "/api/register" else None
             if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email) or len(email) > 254:
                 raise ValueError("Enter a valid email address")
             if path == "/api/register":
@@ -955,15 +1117,23 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(400, {"error": str(exc) or "Invalid details"})
             return
 
-        with connect() as db:
+        with DB_LOCK, connect() as db:
             db.execute("BEGIN IMMEDIATE")
             if path == "/api/register":
+                if email == "aruzhan@example.test":
+                    db.rollback()
+                    self.send_json(409, {"error": "This email address is reserved for the audit-log account."})
+                    return
                 if db.execute("SELECT 1 FROM users WHERE email=? COLLATE NOCASE", (email,)).fetchone():
                     db.rollback()
                     self.send_json(409, {"error": "An account with this email already exists"})
                     return
-                cursor = db.execute("INSERT INTO users(full_name,email,password_hash,role,created_at) VALUES(?,?,?,?,?)",
-                                    (name, email, password_hash(password), "customer", now()))
+                if phone and db.execute("SELECT 1 FROM users WHERE phone_number=?", (phone,)).fetchone():
+                    db.rollback()
+                    self.send_json(409, {"error": "This phone number is already linked to another account"})
+                    return
+                cursor = db.execute("INSERT INTO users(full_name,email,phone_number,password_hash,role,created_at) VALUES(?,?,?,?,?,?)",
+                                    (name, email, phone, password_hash(password), "customer", now()))
                 user_id = cursor.lastrowid
                 cust = db.execute("INSERT INTO customers(name,account_number) VALUES(?,?)",
                                   (name, "KZ•• " + secrets.token_hex(4).upper())).lastrowid
@@ -978,13 +1148,13 @@ class Handler(BaseHTTPRequestHandler):
                 user_id = found["id"]
             db.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
             sid, csrf = create_session(db, user_id)
-            user = db.execute("SELECT full_name,email FROM users WHERE id=?", (user_id,)).fetchone()
+            user = db.execute("SELECT full_name,email,phone_number,role FROM users WHERE id=?", (user_id,)).fetchone()
             action = "Account registered" if path == "/api/register" else "User signed in"
             insert_audit(db, user_id, action, "user", str(user_id), f"{user['full_name']} {action.lower()}.")
             db.commit()
         cookie = f"bank_session={sid}; HttpOnly; SameSite=Strict; Path=/; Max-Age={SESSION_SECONDS}"
         self.send_json(200, {"authenticated": True, "csrfToken": csrf,
-                             "user": {"name": user["full_name"], "email": user["email"]}}, [("Set-Cookie", cookie)])
+                             "user": {"name": user["full_name"], "email": user["email"], "phone": user["phone_number"], "role": user["role"]}}, [("Set-Cookie", cookie)])
 
 
 if __name__ == "__main__":

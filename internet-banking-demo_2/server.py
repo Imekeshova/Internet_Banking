@@ -750,7 +750,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             with connect() as db:
                 rows = db.execute("""SELECT action,entity_type,entity_id,details,created_at FROM audit_logs
-                    WHERE actor_user_id=? ORDER BY id DESC LIMIT 50""", (user["user_id"],)).fetchall()
+                    WHERE actor_user_id=? ORDER BY id DESC""", (user["user_id"],)).fetchall()
                 self.send_json(200, [{"action": r["action"], "entityType": r["entity_type"],
                                      "reference": r["entity_id"], "details": r["details"],
                                      "createdAt": r["created_at"]} for r in rows])
@@ -769,7 +769,7 @@ class Handler(BaseHTTPRequestHandler):
                     JOIN customers sc ON sc.id=sa.customer_id JOIN customers rc ON rc.id=ra.customer_id
                     LEFT JOIN users su ON su.id=sa.owner_user_id LEFT JOIN users ru ON ru.id=ra.owner_user_id
                     WHERE t.sender_account_id IN ({placeholders}) OR t.recipient_account_id IN ({placeholders})
-                    ORDER BY t.created_at DESC LIMIT 50""", (*ids, *ids)).fetchall()
+                    ORDER BY t.created_at DESC""", (*ids, *ids)).fetchall()
                 entries = [self.transfer_payload(r, ids) for r in rows]
                 scheduled = db.execute("""SELECT s.*,su.full_name sender_name,ru.full_name recipient_name,
                     sc.account_number sender_number,rc.account_number recipient_number
@@ -778,10 +778,10 @@ class Handler(BaseHTTPRequestHandler):
                     JOIN customers sc ON sc.id=sa.customer_id JOIN customers rc ON rc.id=ra.customer_id
                     LEFT JOIN users su ON su.id=sa.owner_user_id LEFT JOIN users ru ON ru.id=ra.owner_user_id
                     WHERE s.user_id=? AND s.status IN ('Scheduled','Cancelled','Failed')
-                    ORDER BY s.created_at DESC LIMIT 50""", (user["user_id"],)).fetchall()
+                    ORDER BY s.created_at DESC""", (user["user_id"],)).fetchall()
                 entries.extend(self.scheduled_payload(r) for r in scheduled)
                 entries.sort(key=lambda row: row["createdAt"], reverse=True)
-                self.send_json(200, entries[:50])
+                self.send_json(200, entries)
             return
         match = re.fullmatch(r"/api/transfers/([^/]+)", path)
         if match:

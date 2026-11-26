@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f7f4"><title data-i18n="pageTitle">Internet Banking Demo</title>
+  <link rel="stylesheet" href="/date-picker.css">
   <style>
     :root{--ink:#152923;--muted:#718078;--green:#176b52;--green2:#e7f3ed;--line:#e7ece8;--paper:#fff;--bg:#f5f7f4;--red:#b34035;--amber:#a66b12;--shadow:0 16px 50px #233b3010}
     *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}
@@ -42,13 +43,13 @@
     <div class="greeting"><div><div class="eyebrow" data-i18n="personalBanking">Personal banking</div><h1><span data-i18n="greeting">Good day,</span> <span id="customerName">—</span></h1></div><label class="switcher"><span data-i18n="yourAccount">Your account</span> <select id="accountSelect" aria-label="Choose account" data-i18n-aria="chooseAccount"></select></label></div>
     <div class="layout"><div>
       <section class="card balance-card" aria-label="Account balance" data-i18n-aria="accountBalance"><div class="balance-label" data-i18n="availableBalance">Available balance</div><div class="balance" id="balance">₸—</div><div class="card-bottom"><div><span id="accountLabel" data-i18n="account">Account</span><strong id="accountNumber">••••</strong></div><div class="account-icon">₸</div></div></section>
-      <section class="card history lower"><div class="sectionhead"><h2 data-i18n="recentActivity">Recent activity</h2><span id="transferCount" data-i18n="latestActivity">Latest activity</span></div><div class="history-filters" aria-label="Search and filter transfers" data-i18n-aria="searchFilterTransfers"><input id="historySearch" type="search" placeholder="Search recipient, description, or reference" data-i18n-placeholder="searchPlaceholder" aria-label="Search transfers" data-i18n-aria="searchTransfers"><select id="historyStatus" aria-label="Filter by status" data-i18n-aria="filterStatus"><option value="" data-i18n="allStatuses">All statuses</option><option value="Pending" data-i18n="statusPending">Pending</option><option value="Completed" data-i18n="statusCompleted">Completed</option><option value="Failed" data-i18n="statusFailed">Failed</option><option value="Scheduled" data-i18n="statusScheduled">Scheduled</option><option value="Cancelled" data-i18n="statusCancelled">Cancelled</option></select><input id="historyFrom" type="date" aria-label="From date" data-i18n-aria="fromDate"><input id="historyTo" type="date" aria-label="To date" data-i18n-aria="toDate"><input id="historyMin" type="number" min="0" step="0.01" placeholder="Min KZT" data-i18n-placeholder="minKzt" aria-label="Minimum amount" data-i18n-aria="minimumAmount"><input id="historyMax" type="number" min="0" step="0.01" placeholder="Max KZT" data-i18n-placeholder="maxKzt" aria-label="Maximum amount" data-i18n-aria="maximumAmount"><button id="clearHistoryFilters" class="rowaction" type="button" data-i18n="clearFilters">Clear filters</button></div><div id="historyBody" class="empty">Loading activity…</div></section>
+      <section class="card history lower"><div class="sectionhead"><h2 data-i18n="recentActivity">Recent activity</h2><span id="transferCount" data-i18n="latestActivity">Latest activity</span></div><div class="history-filters" aria-label="Search and filter transfers" data-i18n-aria="searchFilterTransfers"><input id="historySearch" type="search" placeholder="Search recipient, description, or reference" data-i18n-placeholder="searchPlaceholder" aria-label="Search transfers" data-i18n-aria="searchTransfers"><select id="historyStatus" aria-label="Filter by status" data-i18n-aria="filterStatus"><option value="" data-i18n="allStatuses">All statuses</option><option value="Pending" data-i18n="statusPending">Pending</option><option value="Completed" data-i18n="statusCompleted">Completed</option><option value="Failed" data-i18n="statusFailed">Failed</option><option value="Scheduled" data-i18n="statusScheduled">Scheduled</option><option value="Cancelled" data-i18n="statusCancelled">Cancelled</option></select><input id="historyFrom" type="text" data-date-kind="date" aria-label="From date" data-i18n-aria="fromDate"><input id="historyTo" type="text" data-date-kind="date" aria-label="To date" data-i18n-aria="toDate"><input id="historyMin" type="number" min="0" step="0.01" placeholder="Min KZT" data-i18n-placeholder="minKzt" aria-label="Minimum amount" data-i18n-aria="minimumAmount"><input id="historyMax" type="number" min="0" step="0.01" placeholder="Max KZT" data-i18n-placeholder="maxKzt" aria-label="Maximum amount" data-i18n-aria="maximumAmount"><button id="clearHistoryFilters" class="rowaction" type="button" data-i18n="clearFilters">Clear filters</button></div><div id="historyBody" class="empty">Loading activity…</div></section>
     </div>
     <section class="card transfer-card"><div class="sectionhead"><h2 data-i18n="makeTransfer">Make a transfer</h2><span data-i18n="withinBank">Within Northstar</span></div>
       <form id="transferForm"><div class="field"><label for="recipientPhone" data-i18n="phoneNumber">Phone number</label><input id="recipientPhone" type="tel" autocomplete="tel" maxlength="32" placeholder="+7 701 234 56 78" data-i18n-placeholder="phoneExample"><div class="sub" data-i18n="phoneRecipientHint">Enter a recipient phone number or select a saved recipient.</div></div><div class="field"><label for="recipient" data-i18n="sendTo">Send to</label><select id="recipient"></select></div>
         <div class="field"><label for="amount" data-i18n="amount">Amount</label><div class="amountbox"><input id="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required><span class="currency">KZT</span></div></div>
         <div class="field"><label for="transferMode" data-i18n="when">When</label><select id="transferMode"><option value="now" data-i18n="sendNow">Send now</option><option value="scheduled" data-i18n="scheduleLater">Schedule for later</option></select></div>
-        <div class="field scheduled-field hidden" id="scheduledField"><label for="scheduledFor" data-i18n="scheduledDate">Scheduled date and time (UTC+5)</label><input id="scheduledFor" type="datetime-local"></div>
+        <div class="field scheduled-field hidden" id="scheduledField"><label for="scheduledFor" data-i18n="scheduledDate">Scheduled date and time (UTC+5)</label><input id="scheduledFor" type="text" data-date-kind="datetime-local"></div>
         <div class="field"><label for="description"><span id="noteLabel" data-i18n="description">Description</span> <span class="muted" data-i18n="optional">(optional)</span></label><textarea id="description" maxlength="200" placeholder="For example: send money to Aigul for utility bills" data-i18n-placeholder="descriptionPlaceholder"></textarea></div>
         <button class="primary" id="submitButton" type="submit" data-i18n="sendTransfer">Send transfer</button></form>
       <div class="limits" id="limitText" data-i18n="loadingLimits">Loading transfer limits…</div><div class="notice" id="notice" role="status" aria-live="polite"></div>
@@ -61,6 +62,7 @@
     <section class="card audit-card hidden" id="auditPanel"><div class="sectionhead"><h2 data-i18n="auditLog">Audit log</h2><span data-i18n="latestEvents">Latest events for your account</span></div><div id="auditBody" class="empty" data-i18n="selectAudit">Select Audit log to load events.</div></section>
     <div class="foot" data-i18n="demoFooter">Demo environment · Sample balances · No real money is moved</div>
   </main>
+<script src="/date-picker.js"></script>
 <script>
   // i18n-catalog:start
   const I18N = {
@@ -225,6 +227,23 @@
     "positiveAmount": "Enter a positive amount with up to 2 decimal places",
     "validAmount": "Enter a valid transfer amount",
     "validSchedule": "Choose a valid scheduled date and time",
+    "validDate": "Choose a valid date",
+    "datePlaceholder": "DD/MM/YYYY",
+    "dateTimePlaceholder": "DD/MM/YYYY HH:mm",
+    "calendarTitle": "Choose a date",
+    "calendarPrevious": "Previous month",
+    "calendarNext": "Next month",
+    "calendarMonth": "Month",
+    "calendarYear": "Year",
+    "calendarMonths": "January|February|March|April|May|June|July|August|September|October|November|December",
+    "calendarWeekdays": "Mon|Tue|Wed|Thu|Fri|Sat|Sun",
+    "calendarTime": "Time (UTC+5)",
+    "calendarHour": "Hour",
+    "calendarMinute": "Minute",
+    "calendarToday": "Today",
+    "calendarClear": "Clear",
+    "calendarApply": "Apply",
+    "calendarOpen": "Open calendar",
     "requestLarge": "Request is too large",
     "invalidRequest": "Invalid request",
     "invalidRequestData": "Invalid request data",
@@ -461,6 +480,23 @@
     "positiveAmount": "Введите положительную сумму с точностью до двух знаков после запятой",
     "validAmount": "Введите корректную сумму перевода",
     "validSchedule": "Выберите корректные дату и время перевода",
+    "validDate": "Выберите корректную дату",
+    "datePlaceholder": "ДД.ММ.ГГГГ",
+    "dateTimePlaceholder": "ДД.ММ.ГГГГ ЧЧ:ММ",
+    "calendarTitle": "Выберите дату",
+    "calendarPrevious": "Предыдущий месяц",
+    "calendarNext": "Следующий месяц",
+    "calendarMonth": "Месяц",
+    "calendarYear": "Год",
+    "calendarMonths": "Январь|Февраль|Март|Апрель|Май|Июнь|Июль|Август|Сентябрь|Октябрь|Ноябрь|Декабрь",
+    "calendarWeekdays": "Пн|Вт|Ср|Чт|Пт|Сб|Вс",
+    "calendarTime": "Время (UTC+5)",
+    "calendarHour": "Час",
+    "calendarMinute": "Минута",
+    "calendarToday": "Сегодня",
+    "calendarClear": "Очистить",
+    "calendarApply": "Применить",
+    "calendarOpen": "Открыть календарь",
     "requestLarge": "Запрос слишком большой",
     "invalidRequest": "Некорректный запрос",
     "invalidRequestData": "Некорректные данные запроса",
@@ -697,6 +733,23 @@
     "positiveAmount": "Үтірден кейін екі таңбадан аспайтын оң соманы енгізіңіз",
     "validAmount": "Дұрыс аударым сомасын енгізіңіз",
     "validSchedule": "Аударымның дұрыс күні мен уақытын таңдаңыз",
+    "validDate": "Дұрыс күнді таңдаңыз",
+    "datePlaceholder": "КК.АА.ЖЖЖЖ",
+    "dateTimePlaceholder": "КК.АА.ЖЖЖЖ СС:ММ",
+    "calendarTitle": "Күнді таңдау",
+    "calendarPrevious": "Алдыңғы ай",
+    "calendarNext": "Келесі ай",
+    "calendarMonth": "Ай",
+    "calendarYear": "Жыл",
+    "calendarMonths": "Қаңтар|Ақпан|Наурыз|Сәуір|Мамыр|Маусым|Шілде|Тамыз|Қыркүйек|Қазан|Қараша|Желтоқсан",
+    "calendarWeekdays": "Дс|Сс|Ср|Бс|Жм|Сб|Жс",
+    "calendarTime": "Уақыт (UTC+5)",
+    "calendarHour": "Сағат",
+    "calendarMinute": "Минут",
+    "calendarToday": "Бүгін",
+    "calendarClear": "Тазалау",
+    "calendarApply": "Қолдану",
+    "calendarOpen": "Күнтізбені ашу",
     "requestLarge": "Сұрау көлемі тым үлкен",
     "invalidRequest": "Жарамсыз сұрау",
     "invalidRequestData": "Сұрау деректері жарамсыз",
@@ -804,7 +857,7 @@
   function statusText(value) { const canonical = String(value || ''); return t('status' + canonical.charAt(0).toUpperCase() + canonical.slice(1).toLowerCase()); }
   function accountLabel(value) { return value === 'Everyday account' ? t('everydayAccount') : value === 'Savings account' ? t('savingsAccount') : value || t('account'); }
   const msg = (key, params = {}) => ({key, params});
-  const SYSTEM_KEYS = ['positiveAmount','validAmount','validEmail','validSchedule','requestLarge','invalidRequest','invalidRequestData','signInRequired','tokenExpired','auditDenied','transferNotFound','notFound','scheduledNotFound','invalidReference','descriptionLong','invalidTransfer','differentRecipient','referenceScheduled','referenceMismatch','scheduleFuture','scheduleYear','reminderLong','invalidScheduled','referenceUsed','enterOldPassword','passwordLength','newPasswordLength','passwordMismatch','newPasswordMismatch','passwordDifferent','invalidPassword','wrongOldPassword','nameLength','enterPassword','invalidDetails','emailExists','wrongPassword','insufficientFunds','unavailableAccount','amountBelow','amountAbove','dailyWouldExceed','insufficientScheduled','passwordChanged','noAccount','sessionExpired','requestFailed','phoneInvalid','phoneDuplicate','phoneRecipientNotFound','emailDuplicate','currentPasswordRequired','currentPasswordInvalid','deleteConfirmationRequired','emailReserved'];
+  const SYSTEM_KEYS = ['positiveAmount','validAmount','validEmail','validSchedule','validDate','requestLarge','invalidRequest','invalidRequestData','signInRequired','tokenExpired','auditDenied','transferNotFound','notFound','scheduledNotFound','invalidReference','descriptionLong','invalidTransfer','differentRecipient','referenceScheduled','referenceMismatch','scheduleFuture','scheduleYear','reminderLong','invalidScheduled','referenceUsed','enterOldPassword','passwordLength','newPasswordLength','passwordMismatch','newPasswordMismatch','passwordDifferent','invalidPassword','wrongOldPassword','nameLength','enterPassword','invalidDetails','emailExists','wrongPassword','insufficientFunds','unavailableAccount','amountBelow','amountAbove','dailyWouldExceed','insufficientScheduled','passwordChanged','noAccount','sessionExpired','requestFailed','phoneInvalid','phoneDuplicate','phoneRecipientNotFound','emailDuplicate','currentPasswordRequired','currentPasswordInvalid','deleteConfirmationRequired','emailReserved'];
   const SYSTEM_MESSAGES = Object.fromEntries(SYSTEM_KEYS.map(key => [I18N.en[key], key]));
   SYSTEM_MESSAGES['Transfer reference is already in use'] = 'referenceUsed';
   SYSTEM_MESSAGES['insufficient funds'] = 'insufficientFunds';
@@ -901,7 +954,7 @@
     const account = accounts.find(a => a.id === Number(currentId)); if (!account) return; $('customerName').textContent = account.name; $('balance').textContent = money(account.balance); $('accountNumber').textContent = account.number; $('accountLabel').textContent = accountLabel(account.label);
   }
   function renderHistory() {
-    const query = $('historySearch').value.trim().toLocaleLowerCase(LOCALES[language]), status = $('historyStatus').value, from = $('historyFrom').value, to = $('historyTo').value, min = $('historyMin').value, max = $('historyMax').value;
+    const query = $('historySearch').value.trim().toLocaleLowerCase(LOCALES[language]), status = $('historyStatus').value, from = dateFieldValue($('historyFrom')), to = dateFieldValue($('historyTo')), min = $('historyMin').value, max = $('historyMax').value;
     const filtered = historyEntries.filter(entry => { const searchable = [entry.counterparty, entry.description, entry.requestId].join(' ').toLocaleLowerCase(LOCALES[language]), day = localDay(entry.createdAt), amount = Number(entry.amount); return (!query || searchable.includes(query)) && (!status || entry.status === status) && (!from || day >= from) && (!to || day <= to) && (!min || amount >= Number(min)) && (!max || amount <= Number(max)); });
     $('transferCount').textContent = historyLoaded ? t('transferCount', {filtered:filtered.length, total:historyEntries.length}) : t('latestActivity');
     if (!historyLoaded || !historyEntries.length || !filtered.length) { historyMarkup = null; $('historyBody').className = 'empty'; $('historyBody').textContent = t(!historyLoaded ? 'loadingActivity' : !historyEntries.length ? 'noTransfers' : 'noMatches'); return; }
@@ -999,8 +1052,9 @@
   function newTransfer() { clearForNew(); $('amount').value = ''; $('description').value = ''; localizeValidity($('amount')); localizeValidity($('description')); $('amount').focus(); }
 
   function validationBound(input, value) {
-    if (input.type === 'datetime-local') return date(value + '+05:00');
-    if (input.type === 'date') return date(value + 'T00:00:00+05:00');
+    const kind = input.dataset.dateKind || input.type;
+    if (kind === 'datetime-local') return date(value + '+05:00');
+    if (kind === 'date') return date(value + 'T00:00:00+05:00');
     const number = Number(value);
     return Number.isFinite(number) ? new Intl.NumberFormat(LOCALES[language], {maximumFractionDigits:20}).format(number) : value;
   }
@@ -1008,16 +1062,20 @@
     input.setCustomValidity('');
     input.setAttribute('lang', language);
     if (input.willValidate === false) return;
-    const validity = input.validity, isDate = ['date','datetime-local'].includes(input.type);
+    const validity = input.validity, kind = input.dataset.dateKind || input.type, isDate = ['date','datetime-local'].includes(kind);
     let message = '';
-    if (validity.badInput) message = t(isDate ? 'validSchedule' : input.type === 'number' ? 'validAmount' : 'validValue');
+    const parsedDate = isDate && input.value ? BankDates.parse(input.value, kind, input.dataset.dateLocale || language) : '';
+    if (validity.badInput) message = t(isDate ? (kind === 'date' ? 'validDate' : 'validSchedule') : input.type === 'number' ? 'validAmount' : 'validValue');
     else if (validity.valueMissing) message = t('requiredField');
     else if (validity.typeMismatch && input.type === 'email') message = t('validEmail');
     else if (validity.tooShort) message = t('tooShort', {min:input.minLength});
     else if (validity.tooLong) message = t('tooLong', {max:input.maxLength});
+    else if (isDate && input.value && parsedDate === null) message = t(kind === 'date' ? 'validDate' : 'validSchedule');
+    else if (isDate && input.value && input.min && parsedDate < input.min) message = t('dateMinimum', {min:validationBound(input, input.min)});
+    else if (isDate && input.value && input.max && parsedDate > input.max) message = t('dateMaximum', {max:validationBound(input, input.max)});
     else if (validity.rangeUnderflow) message = t(isDate ? 'dateMinimum' : 'valueMinimum', {min:validationBound(input, input.min)});
     else if (validity.rangeOverflow) message = t(isDate ? 'dateMaximum' : 'valueMaximum', {max:validationBound(input, input.max)});
-    else if (validity.stepMismatch) message = t(isDate ? 'validSchedule' : input.type === 'number' ? 'validStep' : 'validValue');
+    else if (validity.stepMismatch) message = t(isDate ? (kind === 'date' ? 'validDate' : 'validSchedule') : input.type === 'number' ? 'validStep' : 'validValue');
     else if (!validity.valid) message = t('validValue');
     input.setCustomValidity(message);
   }
@@ -1058,9 +1116,7 @@
   $('detailsDialog').addEventListener('click', event => { if (event.target === $('detailsDialog')) $('detailsDialog').close(); }); $('downloadDetailReceipt').onclick = () => downloadTransferReceipt(selectedTransferDetails);
   $('transferMode').onchange = () => { renderTransferMode(); setScheduledMinimum(); clearForNew(); };
   function dateFieldValue(input) {
-    const value = input.value.trim();
-    if (!value) return '';
-    return `${value}${value.length === 16 ? ':00' : ''}+05:00`;
+    return BankDates.parse(input.value, input.dataset.dateKind || input.type, input.dataset.dateLocale || language) || '';
   }
   $('transferForm').onsubmit = async event => {
     event.preventDefault();
@@ -1086,6 +1142,13 @@
     finally { button.disabled = false; renderTransferMode(); }
   };
   setupValidation();
+  const localizedDatePicker = BankDates.mount({
+    inputs:[$('scheduledFor'), $('historyFrom'), $('historyTo')],
+    getLanguage:() => language,
+    t,
+    today:() => new Date(Date.now() + 5 * 3600000).toISOString().slice(0, 10),
+  });
+  document.addEventListener('languagechange', () => localizedDatePicker.refresh());
   setInterval(async () => { if (refreshing || $('bankView').classList.contains('hidden')) return; refreshing = true; try { await Promise.all([loadAccounts(), loadLimits()]); if (!$('auditPanel').classList.contains('hidden')) await loadAudit(); document.dispatchEvent(new Event('bankrefresh')); } catch {} finally { refreshing = false; } }, 2000);
   applyLanguage(); setScheduledMinimum();
   (async () => { try { const session = await api('/api/session'); if (session.authenticated) { csrfToken = session.csrfToken; await openBank(session.user); } else showAuth('login'); } catch (error) { if (error.name !== 'AbortError') { showAuth('login'); reportError($('authNotice'), error); } } })();

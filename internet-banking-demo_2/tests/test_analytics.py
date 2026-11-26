@@ -71,7 +71,9 @@ class AnalyticsChecks(unittest.TestCase):
             root = Path(directory)
             assets = {"/": ("index.html", "text/html; charset=utf-8", b"<!doctype html>"),
                       "/analytics.js": ("analytics.js", "text/javascript; charset=utf-8", b"window.analytics = {};"),
-                      "/analytics.css": ("analytics.css", "text/css; charset=utf-8", b".analytics { display: grid; }")}
+                      "/analytics.css": ("analytics.css", "text/css; charset=utf-8", b".analytics { display: grid; }"),
+                      "/date-picker.js": ("date-picker.js", "text/javascript; charset=utf-8", b"window.BankDates = {};"),
+                      "/date-picker.css": ("date-picker.css", "text/css; charset=utf-8", b".date-dialog { display: grid; }")}
             for filename, _, content in assets.values():
                 (root / filename).write_bytes(content)
             (root / "private.txt").write_text("Do not serve this file", encoding="utf-8")

@@ -537,6 +537,8 @@ class Handler(BaseHTTPRequestHandler):
             "/": ("index.html", "text/html; charset=utf-8"),
             "/analytics.js": ("analytics.js", "text/javascript; charset=utf-8"),
             "/analytics.css": ("analytics.css", "text/css; charset=utf-8"),
+            "/date-picker.js": ("date-picker.js", "text/javascript; charset=utf-8"),
+            "/date-picker.css": ("date-picker.css", "text/css; charset=utf-8"),
         }
         if path in public_files:
             filename, content_type = public_files[path]

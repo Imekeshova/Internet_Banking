@@ -23,9 +23,12 @@ internet-banking-demo_2/
 │   ├── test_limits.py    # Invalid inputs and UTC+5 daily-limit boundaries
 │   ├── test_scheduled.py # Scheduled transfer lifecycle and recovery
 │   ├── test_ui.cjs       # Localization and form behavior checks
-│   └── test_analytics_ui.cjs # Async statistics and keyboard-focus regressions
+│   ├── test_analytics_ui.cjs # Async statistics and keyboard-focus regressions
+│   └── test_date_picker.cjs # Date parsing, leap years and timezone independence
 ├── analytics.js          # Statistics rendering and API refresh
 ├── analytics.css         # Statistics cards and responsive layout
+├── date-picker.js        # Localized date entry and keyboard-accessible calendar
+├── date-picker.css       # Calendar and date-field layout
 ├── index.html            # Single-page web client interface
 ├── server.py             # Python HTTP server, SQLite database & background worker
 ├── start.bat             # One-click Windows launcher
@@ -89,6 +92,8 @@ Defaults can be changed with environment variables before launching the server:
 
 The EN / RU / KK buttons switch languages in one click before and after sign-in. English (`en`), Russian (`ru`), and Kazakh (`kk`) cover the main forms, transfer statuses, errors, history, details and receipts. The choice is saved in the current browser. Names and notes entered by users are kept as written. Currency remains KZT; displayed operation times and scheduling use UTC+5. Kazakh month names have an explicit fallback for browsers with incomplete locale data.
 
+Scheduled transfers and history filters use the application's own localized date controls, so the browser's language cannot supply a conflicting date placeholder or calendar. English shows `DD/MM/YYYY` (with `HH:mm` for scheduling); Russian and Kazakh show day-month-year separated by dots, with localized placeholder letters, month/day names and actions. Dates can be typed or selected from the calendar. Changing language preserves the chosen day and time. Internally, filters compare ISO dates and scheduling sends `YYYY-MM-DDTHH:mm`, still interpreted as UTC+5. Impossible dates and incomplete times are rejected; the calendar supports arrow keys, Escape, Apply and Clear.
+
 The dashboard shows two separate totals across all accounts owned by the signed-in customer:
 
 * **This week:** successful outgoing amount and count since Monday 00:00, UTC+5.
@@ -114,6 +119,7 @@ For older completed records, migration uses an available successful audit event 
 | LANG-02 | Language persists without losing form data | Switch with a partially filled form; values remain. Refresh; the selected language remains. |
 | LANG-03 | Dates stay readable and use UTC+5 in every language | Check operation dates, the statistics month and scheduled audit details in EN/RU/KK, including midnight and year rollover; Kazakh months must not appear as `M11`. |
 | LANG-04 | Form validation uses the selected interface language | In a Russian-language browser, select KK and enter an amount below/above the limits, an invalid decimal, an empty required field, invalid email, short password or invalid scheduled time. Native validation messages must use KK before submission and after further editing. Repeat in RU/EN, switch languages with an invalid value, then correct it and confirm the form is usable. Changes to server limits and recipient options must refresh validity too. |
+| LANG-05 | Date entry and calendars follow the interface language | With a Russian-language browser, EN displays `DD/MM/YYYY HH:mm` and English month/day/action labels in scheduling and both history filters. Switch to RU/KK without changing the chosen instant. Test a leap day, an impossible date, keyboard selection, Escape/Apply/Clear, and ISO submission with UTC+5. |
 | LIM-01 | Amount boundaries and daily allowance are enforced by the server | With default settings, reject below 100 KZT and above 1,000,000 KZT; include Pending and Completed requests created in the current UTC+5 day toward 2,000,000 KZT across the customer's accounts. Failed requests do not consume allowance. |
 | LIM-02 | Invalid inputs never select an unintended account or crash a handler | Both transfer endpoints return 400 for fractional/boolean/out-of-range account IDs and oversized/nonfinite amounts, without creating a transfer or timer. Integer IDs and integer strings remain accepted. |
 | STAT-01 | Week and month are separate calendar periods in UTC+5 | A successful transfer before Monday but within this month increases only the monthly total. Test Sunday/Monday, month and year boundaries. |
@@ -179,7 +185,7 @@ python -m unittest discover -v
 With Node.js installed, run the dependency-free JavaScript checks for translation coverage, form behavior, async statistics, keyboard focus and syntax:
 
 ```powershell
-node --test tests/test_ui.cjs tests/test_analytics_ui.cjs
+node --test tests/test_ui.cjs tests/test_analytics_ui.cjs tests/test_date_picker.cjs
 ```
 
 ### Covered Verification Areas
@@ -193,8 +199,11 @@ node --test tests/test_ui.cjs tests/test_analytics_ui.cjs
 * **Scheduled transfers (`test_scheduled.py`):** deferred debit, cancellation, execution-time checks, retry safety and restart recovery.
 * **Input boundaries (`test_limits.py`):** strict account IDs, oversized/nonfinite amounts, no unintended records/timers on rejection and inclusive/exclusive UTC+5 day boundaries.
 * **UI behavior (`test_ui.cjs`, `test_analytics_ui.cjs`):** preserved form values and canonical statuses, language-aware dates/validation, hidden-field constraints, safe rendering, stale-response isolation and statistics refresh recovery. These tests execute application JavaScript with lightweight DOM adapters; browser layout is checked separately.
+* **Date controls (`test_date_picker.cjs`):** strict localized/ISO parsing, Gregorian leap years, minute precision, language roundtrips and results independent of four operating-system timezones. UI integration additionally checks ISO filtering/submission values and scheduling bounds.
 
 Backend verification on 25 November 2026: **64 Python tests passed**. The subsequent frontend verification passed **31 JavaScript checks**, including validation before submission, repeated edits, language changes and dynamic constraints. Browser checks covered EN/RU/KK switching and persistence, preserved form input, localized Kazakh dates, desktop/390px/320px layout widths, successful transfers, safe retries, failed transfers, scheduled cancellation and keyboard focus during polling. Two successful transfers of 100.33 and 200.67 KZT added exactly 301 KZT to the seeded 10,000 KZT total; the failed 150,000 KZT transfer and cancelled 500 KZT schedules changed neither statistics nor daily usage. The validation follow-up reproduced Russian native tooltips under KK, verified translated amount/email/password/date messages in the browser, and confirmed that correcting an amount allows a transfer again. Browser checks used a separate temporary demo database, not the user's saved balances.
+
+Date-control follow-up on 26 November 2026: **44 JavaScript checks and the public-asset allowlist/MIME test passed**. Browser checks verified localized placeholders/months/weekdays/actions, selection and preservation across EN/RU/KK, Escape and arrow keys, history filtering/clearing, and calendar fit at 1280px, 390px and 320px. A temporary-database schedule entered as `27.11.2026 14:35` sent `2026-11-27T14:35` and was stored as `2026-11-27T09:35:00+00:00`, then cancelled.
 
 ## Security, Privacy & Ethics Compliance
 

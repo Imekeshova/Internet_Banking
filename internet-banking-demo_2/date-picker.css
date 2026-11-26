@@ -1,0 +1,32 @@
+.bank-date-control{position:relative;min-width:0;width:100%}
+.bank-date-control>input{width:100%;padding-right:42px!important}
+.bank-date-open{position:absolute;right:4px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:34px;height:30px;border:0;border-radius:7px;background:transparent;color:#176b52;padding:5px}
+.bank-date-open svg{display:block;width:20px;height:20px}
+.bank-date-open:hover{background:#e9f3ed}.bank-date-open:disabled{opacity:.4;cursor:default}
+.bd-dialog{width:min(350px,calc(100vw - 28px));max-height:calc(100dvh - 28px);padding:0;border:1px solid #dce7df;border-radius:18px;background:#fff;color:#152923;box-shadow:0 18px 60px #102b2033;font:14px/1.4 system-ui,sans-serif;overflow:auto}
+.bd-dialog::backdrop{background:#10251d66}
+.bd-content{padding:20px}
+.bd-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.bd-heading h2{font-size:17px;margin:0;font-weight:700;letter-spacing:-.3px}
+.bd-dialog button{cursor:pointer;font:inherit;color:inherit;border:0;border-radius:7px;background:transparent;padding:7px;min-width:0}
+.bd-dialog button:hover{background:#edf5ef}.bd-dialog button:focus-visible,.bd-dialog select:focus-visible,.bd-dialog input:focus-visible{outline:3px solid #78b799;outline-offset:2px}
+.bd-dialog button:disabled{opacity:.3;cursor:default}.bd-dialog button:disabled:hover{background:transparent}
+.bd-dialog .bd-icon{width:30px;height:34px;padding:0;font-size:25px;color:#176b52;flex:none}
+.bd-navigation{display:flex;align-items:flex-end;gap:7px;margin-bottom:15px}
+.bd-navigation label{display:block;min-width:0;margin:0;line-height:1.25}
+.bd-navigation label>span,.bd-time label>span{display:block;font-size:10px;color:#63776b;margin-bottom:4px;font-weight:600}
+.bd-month-label{flex:1}.bd-year-label{width:62px}
+.bd-dialog select,.bd-dialog input{font:inherit;font-size:13px;background:#f8faf8;color:#152923;border:1px solid #dce7df;border-radius:7px;padding:7px 6px;width:100%;height:34px;box-sizing:border-box}
+.bd-weekdays,.bd-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.bd-weekdays{margin-bottom:5px;color:#748277;font-size:11px;text-align:center}
+.bd-weekdays span{padding:4px 0}.bd-week{margin-bottom:3px}
+.bd-dialog .bd-day{aspect-ratio:1;min-height:34px;padding:5px;text-align:center;font-size:13px}
+.bd-dialog .bd-outside{color:#93a196}.bd-dialog .bd-day[aria-current=date]{box-shadow:inset 0 0 0 1px #91b6a1}
+.bd-dialog .bd-day[aria-selected=true]{background:#176b52;color:white;font-weight:700}
+.bd-time{display:flex;align-items:flex-end;gap:9px;padding:12px 0 0;border:0;border-top:1px solid #e4ebe5;margin:13px 0 0}
+.bd-time legend{padding:0 6px 0 0;font-size:11px;color:#63776b}.bd-time label{flex:1;margin:0}.bd-time>span{line-height:34px}
+.bd-actions{display:flex;gap:4px;margin-top:18px;align-items:center}
+.bd-dialog .bd-actions button{font-size:12px;padding:9px 8px;overflow-wrap:anywhere}
+.bd-dialog .bd-actions .bd-apply{margin-left:auto;background:#176b52;color:white;font-weight:650;min-height:36px}
+.bd-dialog .bd-actions .bd-apply:hover{background:#12563f}
+@media(max-width:390px){.bd-content{padding:16px}.bd-navigation{gap:5px}.bd-dialog .bd-actions button{padding:9px 6px;font-size:11px}.bd-heading h2{font-size:16px}}

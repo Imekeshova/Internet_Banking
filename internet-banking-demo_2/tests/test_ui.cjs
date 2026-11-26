@@ -7,6 +7,7 @@ const vm = require('node:vm');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const analytics = fs.readFileSync(path.join(__dirname, '..', 'analytics.js'), 'utf8');
+const datePicker = fs.readFileSync(path.join(__dirname, '..', 'date-picker.js'), 'utf8');
 const catalogBlock = html.match(/\/\/ i18n-catalog:start([\s\S]*?)\/\/ i18n-catalog:end/);
 assert.ok(catalogBlock, 'The translation catalog must have an isolated test boundary');
 const context = vm.createContext({});
@@ -49,7 +50,7 @@ test('Russian and Kazakh text survives UTF-8 file writing', () => {
 });
 
 test('Every literal translation key used by markup or JavaScript exists', () => {
-  const sources = html + analytics;
+  const sources = html + analytics + datePicker;
   const referenced = [
     ...[...sources.matchAll(/data-i18n(?:-[\w-]+)?="([\w.-]+)"/g)].map(m => m[1]),
     ...[...sources.matchAll(/\bt\(\s*['"]([\w.-]+)['"]/g)].map(m => m[1]),
@@ -81,6 +82,7 @@ test('Inline application scripts parse before reaching the browser', () => {
     new vm.Script(match[1]);
   }
   new vm.Script(analytics);
+  new vm.Script(datePicker);
 });
 
 // Execute the application's functions against a small DOM adapter. No server,
@@ -154,6 +156,7 @@ function appHarness(now = Date.parse('2026-11-25T10:20:59Z')) {
     Date: class extends Date { static now() { return now; } },
     Event: class { constructor(type) { this.type = type; } },
   });
+  vm.runInContext(datePicker, sandbox);
   const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
   const setupEnd = script.indexOf("document.querySelectorAll('[data-language]').forEach(button => { button.onclick");
   assert.ok(setupEnd > 0, 'App setup boundary must exist');
@@ -171,7 +174,10 @@ test('Switching language preserves entered transfer data and canonical filter va
     assert.equal(app.document.documentElement.lang, language);
     assert.equal(app.storage.get('northstar.language'), language);
     assert.equal(app.document.title, catalog[language].pageTitle);
-    for (const [id, value] of Object.entries(entered)) assert.equal(app.get(id).value, value, `${language}: ${id} changed`);
+    for (const [id, value] of Object.entries(entered)) {
+      const actual = id === 'scheduledFor' ? app.run("dateFieldValue($('scheduledFor'))") : app.get(id).value;
+      assert.equal(actual, value, `${language}: ${id} changed`);
+    }
     const selected = app.document.querySelectorAll('[data-language]').filter(button => button.getAttribute('aria-pressed') === 'true');
     assert.deepEqual(selected.map(button => button.dataset.language), [language]);
   }
@@ -413,8 +419,10 @@ test('Validation boundaries show localized numbers and readable scheduled dates'
     assert.equal(amount.validationMessage, catalog[language].valueMinimum.replace('{min}', decimal));
     app.get('transferMode').value = 'scheduled';
     app.run('renderTransferMode()');
-    scheduled.min = '2026-11-27T14:30'; scheduled.value = '2026-11-26T14:30';
-    scheduled.validity = {valid:false, customError:false, rangeUnderflow:true};
+    scheduled.min = '2026-11-27T14:30';
+    scheduled.dataset.dateLocale = language;
+    scheduled.value = language === 'en' ? '26/11/2026 14:30' : '26.11.2026 14:30';
+    scheduled.validity = {valid:true, customError:false};
     scheduled.dispatchEvent({type:'change'});
     const readable = app.run("date('2026-11-27T14:30+05:00')");
     assert.equal(scheduled.validationMessage, catalog[language].dateMinimum.replace('{min}', readable));
@@ -434,13 +442,98 @@ test('Malformed numbers and dates show a helpful translated error before require
     assert.equal(amount.validationMessage, catalog[language].validAmount);
     app.get('transferMode').value = 'scheduled';
     app.run('renderTransferMode()');
-    scheduled.validity = {valid:false, customError:false, badInput:true, valueMissing:true};
+    scheduled.dataset.dateLocale = language;
+    scheduled.value = language === 'en' ? '31/02/2026 14:30' : '31.02.2026 14:30';
+    scheduled.validity = {valid:true, customError:false};
     scheduled.dispatchEvent({type:'input'});
     assert.equal(scheduled.validationMessage, catalog[language].validSchedule);
-    scheduled.value = '2026-11-27T14:30:25';
-    scheduled.validity = {valid:false, customError:false, stepMismatch:true};
+    scheduled.value = language === 'en' ? '27/11/2026 14:30:25' : '27.11.2026 14:30:25';
+    scheduled.validity = {valid:true, customError:false};
     scheduled.dispatchEvent({type:'change'});
     assert.equal(scheduled.validationMessage, catalog[language].validSchedule);
+  }
+});
+
+test('Localized scheduled text produces the same canonical UTC+5 request value in every language', () => {
+  const app = appHarness();
+  const scheduled = app.get('scheduledFor');
+  assert.equal(scheduled.type, 'text', 'Browser-owned date chrome must not supply the visible placeholder');
+  assert.equal(scheduled.dataset.dateKind, 'datetime-local');
+  app.get('transferMode').value = 'scheduled';
+  app.run('renderTransferMode()');
+  for (const language of ['en','ru','kk']) {
+    app.run(`language = '${language}'`);
+    scheduled.dataset.dateLocale = language;
+    scheduled.value = language === 'en' ? '27/11/2026 14:30' : '27.11.2026 14:30';
+    assert.equal(app.run("dateFieldValue($('scheduledFor'))"), '2026-11-27T14:30');
+    app.run("localizeValidity($('scheduledFor'))");
+    assert.equal(scheduled.validationMessage, '', `${language}: valid localized schedule rejected`);
+    app.run(`setLanguage('${language === 'en' ? 'kk' : 'en'}')`);
+    assert.equal(app.run("dateFieldValue($('scheduledFor'))"), '2026-11-27T14:30', 'Language changes must not reinterpret the chosen date');
+  }
+});
+
+test('Localized history filters compare canonical banking days and include both UTC+5 boundaries', () => {
+  const app = appHarness();
+  app.run(`historyLoaded = true; historyEntries = [
+    {requestId:'TR-BEFORE',createdAt:'2026-11-24T18:59:59Z'},
+    {requestId:'TR-START',createdAt:'2026-11-24T19:00:00Z'},
+    {requestId:'TR-END',createdAt:'2026-11-25T18:59:59Z'},
+    {requestId:'TR-AFTER',createdAt:'2026-11-25T19:00:00Z'}
+  ].map(entry => ({...entry,counterparty:'Amina',direction:'outgoing',status:'Completed',amount:1000}));`);
+  for (const language of ['en','ru','kk']) {
+    app.run(`language = '${language}'`);
+    for (const id of ['historyFrom','historyTo']) {
+      const input = app.get(id);
+      assert.equal(input.type, 'text');
+      input.dataset.dateLocale = language;
+      input.value = language === 'en' ? '25/11/2026' : '25.11.2026';
+      app.run(`localizeValidity($('${id}'))`);
+      assert.equal(input.validationMessage, '');
+    }
+    app.run('renderHistory()');
+    const rendered = app.get('historyBody').innerHTML;
+    assert.ok(rendered.includes('TR-START') && rendered.includes('TR-END'), `${language}: current banking day missing`);
+    assert.ok(!rendered.includes('TR-BEFORE') && !rendered.includes('TR-AFTER'), `${language}: neighboring day leaked in`);
+    app.get('historyFrom').value = ''; app.get('historyTo').value = '';
+    app.run('renderHistory()');
+    assert.ok(app.get('historyBody').innerHTML.includes('TR-BEFORE'));
+    assert.ok(app.get('historyBody').innerHTML.includes('TR-AFTER'));
+  }
+});
+
+test('Text date controls reject impossible or incomplete dates and enforce canonical schedule limits', () => {
+  const app = appHarness();
+  const scheduled = app.get('scheduledFor');
+  app.run('setupValidation()');
+  app.get('transferMode').value = 'scheduled';
+  app.run('renderTransferMode()');
+  scheduled.min = '2026-11-27T14:30'; scheduled.max = '2027-11-25T15:20';
+  for (const language of ['en','ru','kk']) {
+    app.run(`language = '${language}'`);
+    scheduled.dataset.dateLocale = language;
+    for (const raw of ['31/04/2027 14:30', '29/02/2027 14:30', '27/11/2026', '27/11/2026 24:00', '27/11/2026 14:']) {
+      scheduled.value = language === 'en' ? raw : raw.replaceAll('/', '.');
+      scheduled.dispatchEvent({type:'input'});
+      assert.equal(scheduled.validationMessage, catalog[language].validSchedule, `${language}: ${raw} was accepted`);
+      assert.ok(!app.run("dateFieldValue($('scheduledFor'))"), 'Invalid display text must not become an API timestamp');
+    }
+    scheduled.value = language === 'en' ? '25/11/2027 15:21' : '25.11.2027 15:21';
+    scheduled.dispatchEvent({type:'change'});
+    const bound = app.run("date('2027-11-25T15:20+05:00')");
+    assert.equal(scheduled.validationMessage, catalog[language].dateMaximum.replace('{max}', bound));
+    scheduled.value = language === 'en' ? '27/11/2026 14:30' : '27.11.2026 14:30';
+    scheduled.dispatchEvent({type:'change'});
+    assert.equal(scheduled.validationMessage, '', 'Correcting the date must clear the previous error');
+    const from = app.get('historyFrom');
+    from.dataset.dateLocale = language;
+    from.value = language === 'en' ? '29/02/2027' : '29.02.2027';
+    from.dispatchEvent({type:'input'});
+    assert.equal(from.validationMessage, catalog[language].validDate);
+    from.value = language === 'en' ? '29/02/2028' : '29.02.2028';
+    from.dispatchEvent({type:'input'});
+    assert.equal(from.validationMessage, '', 'Leap-year history dates must be accepted');
+    assert.equal(app.run("dateFieldValue($('historyFrom'))"), '2028-02-29');
   }
 });
 

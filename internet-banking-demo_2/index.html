@@ -18,6 +18,8 @@
     .top-actions{display:flex;align-items:center;gap:14px}.language-control{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}.language-control select{padding:7px 9px}.top{min-height:72px;height:auto;padding-top:12px;padding-bottom:12px;gap:14px}.topright{flex-wrap:wrap}.detail-actions .primary{width:auto}@media(max-width:680px){.top{flex-wrap:wrap}.top-actions{flex:1;justify-content:flex-end;flex-wrap:wrap;gap:8px}.topright{justify-content:flex-end}.language-control span{display:none}.brand small{font-size:9px}}
   </style>
   <link rel="stylesheet" href="/analytics.css">
+  <link rel="stylesheet" href="/date-picker.css">
+  <script src="/date-picker.js"></script>
 </head>
 <body>
   <header class="top"><div class="brand"><div class="brandmark">↗</div><div>Northstar Bank<small data-i18n="brandSubtitle">INTERNET BANKING DEMO</small></div></div><div class="top-actions"><div class="language-control" role="group" id="languageControl" data-i18n-aria="language" aria-label="Language"><button type="button" data-language="en" lang="en" aria-pressed="true">EN</button><button type="button" data-language="ru" lang="ru" aria-pressed="false">RU</button><button type="button" data-language="kk" lang="kk" aria-pressed="false">KK</button></div><div class="topright hidden" id="userBar"><button class="hidden" id="auditToggle" type="button" data-i18n="auditLog">Audit log</button><span id="userEmail"></span><div class="avatar" id="avatar">A</div><button id="logoutButton" data-i18n="signOut">Sign out</button></div></div></header>
@@ -42,13 +44,13 @@
     <div class="greeting"><div><div class="eyebrow" data-i18n="personalBanking">Personal banking</div><h1><span data-i18n="greeting">Good day,</span> <span id="customerName">—</span></h1></div><label class="switcher"><span data-i18n="yourAccount">Your account</span> <select id="accountSelect" aria-label="Choose account" data-i18n-aria="chooseAccount"></select></label></div>
     <div class="layout"><div>
       <section class="card balance-card" aria-label="Account balance" data-i18n-aria="accountBalance"><div class="balance-label" data-i18n="availableBalance">Available balance</div><div class="balance" id="balance">₸—</div><div class="card-bottom"><div><span id="accountLabel" data-i18n="account">Account</span><strong id="accountNumber">••••</strong></div><div class="account-icon">₸</div></div></section>
-      <section class="card history lower"><div class="sectionhead"><h2 data-i18n="recentActivity">Recent activity</h2><span id="transferCount" data-i18n="latestActivity">Latest activity</span></div><div class="history-filters" aria-label="Search and filter transfers" data-i18n-aria="searchFilterTransfers"><input id="historySearch" type="search" placeholder="Search recipient, description, or reference" data-i18n-placeholder="searchPlaceholder" aria-label="Search transfers" data-i18n-aria="searchTransfers"><select id="historyStatus" aria-label="Filter by status" data-i18n-aria="filterStatus"><option value="" data-i18n="allStatuses">All statuses</option><option value="Pending" data-i18n="statusPending">Pending</option><option value="Completed" data-i18n="statusCompleted">Completed</option><option value="Failed" data-i18n="statusFailed">Failed</option><option value="Scheduled" data-i18n="statusScheduled">Scheduled</option><option value="Cancelled" data-i18n="statusCancelled">Cancelled</option></select><input id="historyFrom" type="date" aria-label="From date" data-i18n-aria="fromDate"><input id="historyTo" type="date" aria-label="To date" data-i18n-aria="toDate"><input id="historyMin" type="number" min="0" step="0.01" placeholder="Min KZT" data-i18n-placeholder="minKzt" aria-label="Minimum amount" data-i18n-aria="minimumAmount"><input id="historyMax" type="number" min="0" step="0.01" placeholder="Max KZT" data-i18n-placeholder="maxKzt" aria-label="Maximum amount" data-i18n-aria="maximumAmount"><button id="clearHistoryFilters" class="rowaction" type="button" data-i18n="clearFilters">Clear filters</button></div><div id="historyBody" class="empty">Loading activity…</div></section>
+      <section class="card history lower"><div class="sectionhead"><h2 data-i18n="recentActivity">Recent activity</h2><span id="transferCount" data-i18n="latestActivity">Latest activity</span></div><div class="history-filters" aria-label="Search and filter transfers" data-i18n-aria="searchFilterTransfers"><input id="historySearch" type="search" placeholder="Search recipient, description, or reference" data-i18n-placeholder="searchPlaceholder" aria-label="Search transfers" data-i18n-aria="searchTransfers"><select id="historyStatus" aria-label="Filter by status" data-i18n-aria="filterStatus"><option value="" data-i18n="allStatuses">All statuses</option><option value="Pending" data-i18n="statusPending">Pending</option><option value="Completed" data-i18n="statusCompleted">Completed</option><option value="Failed" data-i18n="statusFailed">Failed</option><option value="Scheduled" data-i18n="statusScheduled">Scheduled</option><option value="Cancelled" data-i18n="statusCancelled">Cancelled</option></select><input id="historyFrom" type="text" data-date-kind="date" placeholder="DD/MM/YYYY" autocomplete="off" aria-label="From date" data-i18n-aria="fromDate"><input id="historyTo" type="text" data-date-kind="date" placeholder="DD/MM/YYYY" autocomplete="off" aria-label="To date" data-i18n-aria="toDate"><input id="historyMin" type="number" min="0" step="0.01" placeholder="Min KZT" data-i18n-placeholder="minKzt" aria-label="Minimum amount" data-i18n-aria="minimumAmount"><input id="historyMax" type="number" min="0" step="0.01" placeholder="Max KZT" data-i18n-placeholder="maxKzt" aria-label="Maximum amount" data-i18n-aria="maximumAmount"><button id="clearHistoryFilters" class="rowaction" type="button" data-i18n="clearFilters">Clear filters</button></div><div id="historyBody" class="empty">Loading activity…</div></section>
     </div>
     <section class="card transfer-card"><div class="sectionhead"><h2 data-i18n="makeTransfer">Make a transfer</h2><span data-i18n="withinBank">Within Northstar</span></div>
       <form id="transferForm"><div class="field"><label for="recipient" data-i18n="sendTo">Send to</label><select id="recipient" required></select></div>
         <div class="field"><label for="amount" data-i18n="amount">Amount</label><div class="amountbox"><input id="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required><span class="currency">KZT</span></div></div>
         <div class="field"><label for="transferMode" data-i18n="when">When</label><select id="transferMode"><option value="now" data-i18n="sendNow">Send now</option><option value="scheduled" data-i18n="scheduleLater">Schedule for later</option></select></div>
-        <div class="field scheduled-field hidden" id="scheduledField"><label for="scheduledFor" data-i18n="scheduledDate">Scheduled date and time (UTC+5)</label><input id="scheduledFor" type="datetime-local"></div>
+        <div class="field scheduled-field hidden" id="scheduledField"><label for="scheduledFor" data-i18n="scheduledDate">Scheduled date and time (UTC+5)</label><input id="scheduledFor" type="text" data-date-kind="datetime-local" placeholder="DD/MM/YYYY HH:mm" autocomplete="off"></div>
         <div class="field"><label for="description"><span id="noteLabel" data-i18n="description">Description</span> <span class="muted" data-i18n="optional">(optional)</span></label><textarea id="description" maxlength="200" placeholder="For example: send money to Aigul for utility bills" data-i18n-placeholder="descriptionPlaceholder"></textarea></div>
         <button class="primary" id="submitButton" type="submit" data-i18n="sendTransfer">Send transfer</button></form>
       <div class="limits" id="limitText" data-i18n="loadingLimits">Loading transfer limits…</div><div class="notice" id="notice" role="status" aria-live="polite"></div>
@@ -66,6 +68,23 @@
     "pageTitle": "Internet Banking Demo",
     "brandSubtitle": "INTERNET BANKING DEMO",
     "language": "Language",
+    "datePlaceholder": "DD/MM/YYYY",
+    "dateTimePlaceholder": "DD/MM/YYYY HH:mm",
+    "validDate": "Enter a valid date.",
+    "calendarOpen": "Open calendar",
+    "calendarTitle": "Choose a date",
+    "calendarPrevious": "Previous month",
+    "calendarNext": "Next month",
+    "calendarMonths": "January|February|March|April|May|June|July|August|September|October|November|December",
+    "calendarWeekdays": "Mon|Tue|Wed|Thu|Fri|Sat|Sun",
+    "calendarToday": "Today",
+    "calendarClear": "Clear",
+    "calendarApply": "Apply",
+    "calendarTime": "Time (UTC+5)",
+    "calendarHour": "Hour",
+    "calendarMinute": "Minute",
+    "calendarMonth": "Month",
+    "calendarYear": "Year",
     "signOut": "Sign out",
     "secureAccess": "Secure access",
     "signIn": "Sign in",
@@ -278,6 +297,23 @@
     "pageTitle": "Интернет-банкинг — демоверсия",
     "brandSubtitle": "ДЕМО ИНТЕРНЕТ-БАНКИНГА",
     "language": "Язык",
+    "datePlaceholder": "ДД.ММ.ГГГГ",
+    "dateTimePlaceholder": "ДД.ММ.ГГГГ ЧЧ:ММ",
+    "validDate": "Введите корректную дату.",
+    "calendarOpen": "Открыть календарь",
+    "calendarTitle": "Выберите дату",
+    "calendarPrevious": "Предыдущий месяц",
+    "calendarNext": "Следующий месяц",
+    "calendarMonths": "Январь|Февраль|Март|Апрель|Май|Июнь|Июль|Август|Сентябрь|Октябрь|Ноябрь|Декабрь",
+    "calendarWeekdays": "Пн|Вт|Ср|Чт|Пт|Сб|Вс",
+    "calendarToday": "Сегодня",
+    "calendarClear": "Очистить",
+    "calendarApply": "Применить",
+    "calendarTime": "Время (UTC+5)",
+    "calendarHour": "Час",
+    "calendarMinute": "Минута",
+    "calendarMonth": "Месяц",
+    "calendarYear": "Год",
     "signOut": "Выйти",
     "secureAccess": "Безопасный вход",
     "signIn": "Войти",
@@ -490,6 +526,23 @@
     "pageTitle": "Интернет-банкинг — демо нұсқа",
     "brandSubtitle": "ИНТЕРНЕТ-БАНКИНГ ДЕМОСЫ",
     "language": "Тіл",
+    "datePlaceholder": "КК.АА.ЖЖЖЖ",
+    "dateTimePlaceholder": "КК.АА.ЖЖЖЖ СС:ММ",
+    "validDate": "Дұрыс күнді енгізіңіз.",
+    "calendarOpen": "Күнтізбені ашу",
+    "calendarTitle": "Күнді таңдаңыз",
+    "calendarPrevious": "Алдыңғы ай",
+    "calendarNext": "Келесі ай",
+    "calendarMonths": "Қаңтар|Ақпан|Наурыз|Сәуір|Мамыр|Маусым|Шілде|Тамыз|Қыркүйек|Қазан|Қараша|Желтоқсан",
+    "calendarWeekdays": "Дс|Сс|Ср|Бс|Жм|Сб|Жс",
+    "calendarToday": "Бүгін",
+    "calendarClear": "Тазарту",
+    "calendarApply": "Қолдану",
+    "calendarTime": "Уақыт (UTC+5)",
+    "calendarHour": "Сағат",
+    "calendarMinute": "Минут",
+    "calendarMonth": "Ай",
+    "calendarYear": "Жыл",
     "signOut": "Шығу",
     "secureAccess": "Қауіпсіз кіру",
     "signIn": "Кіру",
@@ -749,6 +802,9 @@
   let csrfToken = '', accounts = [], recipients = [], currentId = null, activeRequestId = null, lastTransfer = null, authMode = 'login', limits = {};
   let historyEntries = [], historyLoaded = false, historyMarkup = null, auditEvents = null, selectedTransferDetails = null, detailRequest = 0, sessionGeneration = 0, refreshing = false;
   const notices = new Map(), noticeViews = new WeakMap();
+  let dateControls = null;
+  const dateInputs = () => ['scheduledFor','historyFrom','historyTo'].map($);
+  function dateFieldValue(input) { return BankDates.parse(input.value, input.dataset.dateKind, input.dataset.dateLocale || language); }
   function renderNotice(el) {
     const state = notices.get(el.id); if (!state) return;
     const kind = typeof state.kind === 'function' ? state.kind() : state.kind;
@@ -813,7 +869,9 @@
   function setScheduledMinimum() {
     const firstValidMinute = Math.ceil((Date.now() + 30000) / 60000) * 60000;
     $('scheduledFor').min = new Date(firstValidMinute + 5 * 3600000).toISOString().slice(0, 16);
+    $('scheduledFor').max = new Date(Date.now() + 365 * 86400000 + 5 * 3600000).toISOString().slice(0, 16);
     localizeValidity($('scheduledFor'));
+    dateControls?.refresh();
   }
   function renderLimits() { $('limitText').textContent = limits.minimum == null ? t('loadingLimits') : t('limits', {minimum:money(limits.minimum), maximum:money(limits.maximum), daily:money(limits.daily), used:money(limits.usedToday), remaining:money(limits.remainingToday)}); }
   async function loadLimits() { limits = await api('/api/limits'); $('amount').min = limits.minimum.toFixed(2); $('amount').max = limits.maximum.toFixed(2); localizeValidity($('amount')); renderLimits(); }
@@ -825,7 +883,7 @@
     const account = accounts.find(a => a.id === Number(currentId)); if (!account) return; $('customerName').textContent = account.name; $('balance').textContent = money(account.balance); $('accountNumber').textContent = account.number; $('accountLabel').textContent = accountLabel(account.label);
   }
   function renderHistory() {
-    const query = $('historySearch').value.trim().toLocaleLowerCase(LOCALES[language]), status = $('historyStatus').value, from = $('historyFrom').value, to = $('historyTo').value, min = $('historyMin').value, max = $('historyMax').value;
+    const query = $('historySearch').value.trim().toLocaleLowerCase(LOCALES[language]), status = $('historyStatus').value, from = dateFieldValue($('historyFrom')), to = dateFieldValue($('historyTo')), min = $('historyMin').value, max = $('historyMax').value;
     const filtered = historyEntries.filter(entry => { const searchable = [entry.counterparty, entry.description, entry.requestId].join(' ').toLocaleLowerCase(LOCALES[language]), day = localDay(entry.createdAt), amount = Number(entry.amount); return (!query || searchable.includes(query)) && (!status || entry.status === status) && (!from || day >= from) && (!to || day <= to) && (!min || amount >= Number(min)) && (!max || amount <= Number(max)); });
     $('transferCount').textContent = historyLoaded ? t('transferCount', {filtered:filtered.length, total:historyEntries.length}) : t('latestActivity');
     if (!historyLoaded || !historyEntries.length || !filtered.length) { historyMarkup = null; $('historyBody').className = 'empty'; $('historyBody').textContent = t(!historyLoaded ? 'loadingActivity' : !historyEntries.length ? 'noTransfers' : 'noMatches'); return; }
@@ -903,6 +961,7 @@
   function renderTransferMode() {
     const scheduled = $('transferMode').value === 'scheduled'; $('scheduledField').classList.toggle('hidden', !scheduled); $('scheduledFor').required = scheduled; $('scheduledFor').disabled = !scheduled;
     localizeValidity($('scheduledFor'));
+    dateControls?.refresh();
     $('noteLabel').textContent = t(scheduled ? 'reminderNote' : 'description'); $('submitButton').textContent = t($('submitButton').disabled ? (scheduled ? 'scheduling' : 'submitting') : (scheduled ? 'scheduleTransfer' : 'sendTransfer')); $('transferHint').textContent = t(scheduled ? 'scheduledHint' : 'pendingHint'); $('requestId').textContent = activeRequestId || t('createdWhenSent');
   }
   function transferNotice(transfer) { return transfer.status === 'Scheduled' ? msg('scheduledNotice', {date:date(transfer.scheduledFor), description:transfer.description || t('none'), reference:transfer.requestId}) : msg('transferNotice', {status:statusText(transfer.status), amount:money(transfer.amount), recipient:transfer.to, reference:transfer.requestId}); }
@@ -923,8 +982,9 @@
   function newTransfer() { clearForNew(); $('amount').value = ''; $('description').value = ''; localizeValidity($('amount')); localizeValidity($('description')); $('amount').focus(); }
 
   function validationBound(input, value) {
-    if (input.type === 'datetime-local') return date(value + '+05:00');
-    if (input.type === 'date') return date(value + 'T00:00:00+05:00');
+    const kind = input.dataset.dateKind || input.type;
+    if (kind === 'datetime-local') return date(value + '+05:00');
+    if (kind === 'date') return date(value + 'T00:00:00+05:00');
     const number = Number(value);
     return Number.isFinite(number) ? new Intl.NumberFormat(LOCALES[language], {maximumFractionDigits:20}).format(number) : value;
   }
@@ -932,6 +992,16 @@
     input.setCustomValidity('');
     input.setAttribute('lang', language);
     if (input.willValidate === false) return;
+    if (input.dataset.dateKind) {
+      const value = dateFieldValue(input);
+      let message = '';
+      if (!input.value.trim() && input.required) message = t('requiredField');
+      else if (value === null) message = t(input.dataset.dateKind === 'date' ? 'validDate' : 'validSchedule');
+      else if (value && input.min && value < input.min) message = t('dateMinimum', {min:validationBound(input, input.min)});
+      else if (value && input.max && value > input.max) message = t('dateMaximum', {max:validationBound(input, input.max)});
+      input.setCustomValidity(message);
+      return;
+    }
     const validity = input.validity, isDate = ['date','datetime-local'].includes(input.type);
     let message = '';
     if (validity.badInput) message = t(isDate ? 'validSchedule' : input.type === 'number' ? 'validAmount' : 'validValue');
@@ -954,6 +1024,7 @@
   }
   function applyLanguage() {
     document.documentElement.lang = language; document.title = t('pageTitle'); document.querySelectorAll('[data-language]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.language === language)));
+    if (dateControls) dateControls.refresh(); else BankDates.localize(dateInputs(), language, t);
     document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n)); document.querySelectorAll('[data-i18n-placeholder]').forEach(el => el.placeholder = t(el.dataset.i18nPlaceholder)); document.querySelectorAll('[data-i18n-aria]').forEach(el => el.setAttribute('aria-label', t(el.dataset.i18nAria)));
     renderAuthText(); renderTransferMode(); renderLimits(); renderAccount(); renderRecipients(); renderHistory(); renderAudit(); renderDetails(); $('auditToggle').textContent = t($('auditPanel').classList.contains('hidden') ? 'auditLog' : 'hideAuditLog');
     for (const id of notices.keys()) renderNotice($(id)); document.querySelectorAll('input,select,textarea').forEach(localizeValidity); document.dispatchEvent(new Event('languagechange'));
@@ -979,8 +1050,9 @@
   $('transferMode').onchange = () => { renderTransferMode(); setScheduledMinimum(); clearForNew(); };
   $('transferForm').onsubmit = async event => {
     event.preventDefault(); const button = $('submitButton'), scheduled = $('transferMode').value === 'scheduled'; button.disabled = true; renderTransferMode();
-    try { activeRequestId ||= makeRequestId(); $('requestId').textContent = activeRequestId; const body = {requestId:activeRequestId, fromAccountId:currentId, toAccountId:Number($('recipient').value), amount:$('amount').value}; let endpoint = '/api/transfers'; if (scheduled) { body.scheduledFor = $('scheduledFor').value; body.reminderNote = $('description').value; endpoint = '/api/scheduled'; } else body.description = $('description').value; lastTransfer = await api(endpoint, {method:'POST', body:JSON.stringify(body)}); notice($('notice'), () => transferNotice(lastTransfer), () => transferNoticeKind(lastTransfer), () => transferActions(lastTransfer)); await Promise.all([loadAccounts(), loadLimits()]); } catch (error) { reportError($('notice'), error); } finally { button.disabled = false; renderTransferMode(); }
+    try { activeRequestId ||= makeRequestId(); $('requestId').textContent = activeRequestId; const body = {requestId:activeRequestId, fromAccountId:currentId, toAccountId:Number($('recipient').value), amount:$('amount').value}; let endpoint = '/api/transfers'; if (scheduled) { body.scheduledFor = dateFieldValue($('scheduledFor')); body.reminderNote = $('description').value; endpoint = '/api/scheduled'; } else body.description = $('description').value; lastTransfer = await api(endpoint, {method:'POST', body:JSON.stringify(body)}); notice($('notice'), () => transferNotice(lastTransfer), () => transferNoticeKind(lastTransfer), () => transferActions(lastTransfer)); await Promise.all([loadAccounts(), loadLimits()]); } catch (error) { reportError($('notice'), error); } finally { button.disabled = false; renderTransferMode(); }
   };
+  dateControls = BankDates.mount({inputs:dateInputs(), getLanguage:() => language, t, today:() => localDay(new Date().toISOString())});
   setupValidation();
   setInterval(async () => { if (refreshing || $('bankView').classList.contains('hidden')) return; refreshing = true; try { await Promise.all([loadAccounts(), loadLimits()]); if (!$('auditPanel').classList.contains('hidden')) await loadAudit(); document.dispatchEvent(new Event('bankrefresh')); } catch {} finally { refreshing = false; } }, 2000);
   applyLanguage(); setScheduledMinimum();

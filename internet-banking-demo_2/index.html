@@ -22,6 +22,12 @@
 </head>
 <body>
   <header class="top"><div class="brand"><div class="brandmark">↗</div><div>Northstar Bank<small data-i18n="brandSubtitle">INTERNET BANKING DEMO</small></div></div><div class="top-actions"><div class="language-control" role="group" id="languageControl" data-i18n-aria="language" aria-label="Language"><button type="button" data-language="en" lang="en" aria-pressed="true">EN</button><button type="button" data-language="ru" lang="ru" aria-pressed="false">RU</button><button type="button" data-language="kk" lang="kk" aria-pressed="false">KK</button></div><div class="topright hidden" id="userBar"><button class="hidden" id="auditToggle" type="button" data-i18n="auditLog">Audit log</button><button id="profileButton" type="button" data-i18n="profile">Personal information</button><span id="userEmail"></span><div class="avatar" id="avatar">A</div><button id="logoutButton" data-i18n="signOut">Sign out</button></div></div></header>
+  <nav class="bank-navigation hidden" id="bankNavigation" aria-label="Banking sections" data-i18n-aria="bankNavigation">
+    <div class="bank-tabs" role="tablist" aria-label="Banking sections" data-i18n-aria="bankNavigation">
+      <button type="button" role="tab" id="overviewTab" data-bank-view="overview" aria-controls="overviewPanel" aria-selected="true" tabindex="0" data-i18n="overviewTab">Overview</button>
+      <button type="button" role="tab" id="statisticsTab" data-bank-view="statistics" aria-controls="statisticsPanel" aria-selected="false" tabindex="-1" data-i18n="statisticsTab">Statistics</button>
+    </div>
+  </nav>
   <main id="authView" class="auth-wrap hidden">
     <section class="card auth-card"><div class="eyebrow" data-i18n="secureAccess">Secure access</div><h1 id="authTitle" data-i18n="welcome">Welcome back</h1><p id="authSubtitle" data-i18n="loginSubtitle">Sign in to view your demo account.</p>
       <div class="auth-switch" id="authSwitch"><button id="loginTab" class="active" type="button" data-i18n="signIn">Sign in</button><button id="registerTab" type="button" data-i18n="createAccount">Create account</button></div>
@@ -40,6 +46,7 @@
     </section>
   </main>
   <main id="bankView" class="hidden">
+    <section id="overviewPanel" role="tabpanel" aria-labelledby="overviewTab">
     <div class="greeting"><div><div class="eyebrow" data-i18n="personalBanking">Personal banking</div><h1><span data-i18n="greeting">Good day,</span> <span id="customerName">—</span></h1></div><label class="switcher"><span data-i18n="yourAccount">Your account</span> <select id="accountSelect" aria-label="Choose account" data-i18n-aria="chooseAccount"></select></label></div>
     <div class="layout"><div>
       <section class="card balance-card" aria-label="Account balance" data-i18n-aria="accountBalance"><div class="balance-label" data-i18n="availableBalance">Available balance</div><div class="balance" id="balance">₸—</div><div class="card-bottom"><div><span id="accountLabel" data-i18n="account">Account</span><strong id="accountNumber">••••</strong></div><div class="account-icon">₸</div></div></section>
@@ -56,10 +63,12 @@
       <div class="idline"><span data-i18n="transferReference">Transfer reference</span><code id="requestId" data-i18n="createdWhenSent">Created when you send</code></div>
       <p class="transfer-note" id="transferHint" data-i18n="pendingHint">A new transfer is held as Pending before it is processed.</p>
     </section></div>
+    <section class="card audit-card hidden" id="auditPanel"><div class="sectionhead"><h2 data-i18n="auditLog">Audit log</h2><span data-i18n="latestEvents">Latest events for your account</span></div><div id="auditBody" class="empty" data-i18n="selectAudit">Select Audit log to load events.</div></section>
+    </section>
+    <section id="statisticsPanel" class="hidden" role="tabpanel" aria-labelledby="statisticsTab"></section>
     <dialog class="details-dialog" id="profileDialog" aria-labelledby="profileTitle"><section class="card details-card"><div class="sectionhead"><h2 id="profileTitle" data-i18n="profileTitle">Edit personal information</h2><button class="rowaction" id="closeProfile" type="button" data-i18n="close">Close</button></div><form id="profileForm"><div class="field"><label for="profileName" data-i18n="fullName">Full name</label><input id="profileName" autocomplete="name" minlength="2" maxlength="80" required></div><div class="field"><label for="profileEmail" data-i18n="email">Email</label><input id="profileEmail" type="email" autocomplete="email" maxlength="254" required></div><div class="field"><label for="profilePhone" data-i18n="phoneNumber">Phone number</label><input id="profilePhone" type="tel" autocomplete="tel" maxlength="32" placeholder="+7 701 234 56 78" data-i18n-placeholder="phoneExample"><div class="sub" data-i18n="phoneOptionalHint">Optional phone number.</div></div><div class="field"><label for="profileCurrentPassword" data-i18n="currentPassword">Current password</label><input id="profileCurrentPassword" type="password" autocomplete="current-password" required maxlength="128"></div><button class="primary" id="saveProfile" type="submit" data-i18n="saveProfile">Save changes</button></form><button class="cancelaction" id="openDeleteAccount" type="button" data-i18n="deleteAccount">Delete account</button><div class="notice" id="profileNotice" role="status" aria-live="polite"></div></section></dialog>
     <dialog class="details-dialog" id="deleteAccountDialog" aria-labelledby="deleteAccountTitle"><section class="card details-card"><div class="sectionhead"><h2 id="deleteAccountTitle" data-i18n="deleteAccountTitle">Delete your account?</h2><button class="rowaction" id="closeDeleteAccount" type="button" data-i18n="close">Close</button></div><p data-i18n="deleteAccountWarning">Deleting removes accounts and their transfer history from this demo.</p><form id="deleteAccountForm"><div class="field"><label for="deletePassword" data-i18n="currentPassword">Current password</label><input id="deletePassword" type="password" autocomplete="current-password" required maxlength="128"></div><div class="field"><label for="deleteConfirmation" data-i18n="typeDelete">Type DELETE to confirm</label><input id="deleteConfirmation" required autocomplete="off"></div><button class="cancelaction" id="confirmDeleteAccount" type="submit" data-i18n="deleteAccount">Delete account</button></form><div class="notice" id="deleteNotice" role="status" aria-live="polite"></div></section></dialog>
     <dialog class="details-dialog" id="detailsDialog" aria-labelledby="detailsTitle"><section class="card details-card"><div class="sectionhead"><h2 id="detailsTitle" data-i18n="transferDetails">Transfer details</h2><button class="rowaction" id="closeDetails" type="button" data-i18n="close">Close</button></div><div id="detailsBody"></div><div class="detail-actions"><button class="primary" id="downloadDetailReceipt" type="button" data-i18n="downloadReceipt">Download receipt</button></div></section></dialog>
-    <section class="card audit-card hidden" id="auditPanel"><div class="sectionhead"><h2 data-i18n="auditLog">Audit log</h2><span data-i18n="latestEvents">Latest events for your account</span></div><div id="auditBody" class="empty" data-i18n="selectAudit">Select Audit log to load events.</div></section>
     <div class="foot" data-i18n="demoFooter">Demo environment · Sample balances · No real money is moved</div>
   </main>
 <script src="/date-picker.js"></script>
@@ -70,6 +79,9 @@
     "pageTitle": "Internet Banking Demo",
     "brandSubtitle": "INTERNET BANKING DEMO",
     "language": "Language",
+    "bankNavigation": "Banking sections",
+    "overviewTab": "Overview",
+    "statisticsTab": "Statistics",
     "signOut": "Sign out",
     "secureAccess": "Secure access",
     "signIn": "Sign in",
@@ -331,6 +343,9 @@
     "pageTitle": "Интернет-банкинг — демоверсия",
     "brandSubtitle": "ДЕМО ИНТЕРНЕТ-БАНКИНГА",
     "language": "Язык",
+    "bankNavigation": "Разделы банка",
+    "overviewTab": "Обзор",
+    "statisticsTab": "Статистика",
     "signOut": "Выйти",
     "secureAccess": "Безопасный вход",
     "signIn": "Войти",
@@ -592,6 +607,9 @@
     "pageTitle": "Интернет-банкинг — демо нұсқа",
     "brandSubtitle": "ИНТЕРНЕТ-БАНКИНГ ДЕМОСЫ",
     "language": "Тіл",
+    "bankNavigation": "Банк бөлімдері",
+    "overviewTab": "Шолу",
+    "statisticsTab": "Статистика",
     "signOut": "Шығу",
     "secureAccess": "Қауіпсіз кіру",
     "signIn": "Кіру",
@@ -900,6 +918,18 @@
   let csrfToken = '', accounts = [], recipients = [], currentId = null, activeRequestId = null, lastTransfer = null, authMode = 'login', resetToken = '', limits = {}, currentUser = null;
   let historyEntries = [], historyLoaded = false, historyMarkup = null, auditEvents = null, selectedTransferDetails = null, detailRequest = 0, sessionGeneration = 0, refreshing = false;
   const notices = new Map(), noticeViews = new WeakMap();
+  let currentBankView = 'overview';
+  function setBankView(value) {
+    currentBankView = value === 'statistics' ? 'statistics' : 'overview';
+    for (const name of ['overview','statistics']) {
+      const selected = name === currentBankView;
+      $(name + 'Panel').classList.toggle('hidden', !selected);
+      $(name + 'Tab').setAttribute('aria-selected', String(selected));
+      $(name + 'Tab').tabIndex = selected ? 0 : -1;
+    }
+    $('auditToggle').textContent = t(currentBankView === 'overview' && !$('auditPanel').classList.contains('hidden') ? 'hideAuditLog' : 'auditLog');
+    document.dispatchEvent(new Event('bankviewchange'));
+  }
   function renderNotice(el) {
     const state = notices.get(el.id); if (!state) return;
     const kind = typeof state.kind === 'function' ? state.kind() : state.kind;
@@ -927,6 +957,7 @@
     clearForNew(); $('detailsBody').textContent = ''; $('historyBody').textContent = ''; $('auditBody').textContent = ''; $('accountSelect').textContent = ''; $('recipient').textContent = ''; $('recipientPhone').value = ''; $('userEmail').textContent = ''; $('customerName').textContent = '—'; $('balance').textContent = '₸—'; $('accountNumber').textContent = '••••'; $('accountLabel').textContent = t('account');
     if ($('detailsDialog').open) $('detailsDialog').close(); if ($('profileDialog').open) $('profileDialog').close(); if ($('deleteAccountDialog').open) $('deleteAccountDialog').close();
     document.dispatchEvent(new Event('banksessionchange'));
+    $('bankNavigation').classList.add('hidden'); setBankView('overview');
   }
   async function api(url, options = {}) {
     const generation = sessionGeneration, method = (options.method || 'GET').toUpperCase(), headers = {'Content-Type':'application/json', ...(options.headers || {})};
@@ -947,6 +978,7 @@
     $('authSubtitle').textContent = t(requestingReset ? 'passwordResetRequestSubtitle' : settingReset ? 'passwordResetSetSubtitle' : registering ? 'registerSubtitle' : 'loginSubtitle'); $('authButton').textContent = t(registering ? 'createAccount' : 'signIn');
   }
   function showAuth(mode = 'login') {
+    $('bankNavigation').classList.add('hidden'); setBankView('overview');
     authMode = mode; resetToken = ''; $('authView').classList.remove('hidden'); $('bankView').classList.add('hidden'); $('userBar').classList.add('hidden'); $('authSwitch').classList.remove('hidden'); $('authForm').classList.remove('hidden'); $('passwordResetRequestForm').classList.add('hidden'); $('passwordResetForm').classList.add('hidden');
     $('demoLogin').classList.toggle('hidden', mode !== 'login'); $('forgotButton').classList.toggle('hidden', mode !== 'login'); $('nameField').classList.toggle('hidden', mode !== 'register'); $('phoneField').classList.toggle('hidden', mode !== 'register'); $('confirmField').classList.toggle('hidden', mode !== 'register'); $('authPhone').disabled = mode !== 'register';
     $('authName').required = mode === 'register'; $('authName').disabled = mode !== 'register'; $('authPassword').autocomplete = mode === 'login' ? 'current-password' : 'new-password'; $('authPassword').minLength = mode === 'register' ? 12 : 0; $('authPasswordConfirm').required = mode === 'register';
@@ -956,6 +988,7 @@
     authMode = 'password-reset-request'; $('authSwitch').classList.add('hidden'); $('authForm').classList.add('hidden'); $('passwordResetForm').classList.add('hidden'); $('passwordResetRequestForm').classList.remove('hidden'); $('demoLogin').classList.add('hidden'); $('resetEmail').value = $('authEmail').value.trim(); document.querySelectorAll('#passwordResetRequestForm input').forEach(localizeValidity); renderAuthText(); hideNotice($('authNotice'));
   }
   function showResetPassword(token) {
+    $('bankNavigation').classList.add('hidden'); setBankView('overview');
     resetToken = token; authMode = 'password-reset'; $('authView').classList.remove('hidden'); $('bankView').classList.add('hidden'); $('userBar').classList.add('hidden'); $('authSwitch').classList.add('hidden'); $('authForm').classList.add('hidden'); $('passwordResetRequestForm').classList.add('hidden'); $('passwordResetForm').classList.remove('hidden'); $('demoLogin').classList.add('hidden'); renderAuthText(); document.querySelectorAll('#passwordResetForm input').forEach(localizeValidity); hideNotice($('authNotice'));
   }
   function makeRequestId() { const bytes = new Uint8Array(16); crypto.getRandomValues(bytes); return 'TR-' + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('').toUpperCase(); }
@@ -963,6 +996,7 @@
   async function openBank(user) {
     sessionGeneration++; currentUser = user; $('authView').classList.add('hidden'); $('bankView').classList.remove('hidden'); $('userBar').classList.remove('hidden'); syncUserIdentity();
     $('auditToggle').classList.toggle('hidden', user.role !== 'admin'); $('auditPanel').classList.add('hidden'); $('auditToggle').textContent = t('auditLog');
+    setBankView('overview'); $('bankNavigation').classList.remove('hidden');
     setScheduledMinimum(); await Promise.all([loadAccounts(), loadRecipients(), loadLimits()]); document.dispatchEvent(new Event('bankready'));
   }
   function setScheduledMinimum() {
@@ -1116,7 +1150,7 @@
   function applyLanguage() {
     document.documentElement.lang = language; document.title = t('pageTitle'); document.querySelectorAll('[data-language]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.language === language)));
     document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n)); document.querySelectorAll('[data-i18n-placeholder]').forEach(el => el.placeholder = t(el.dataset.i18nPlaceholder)); document.querySelectorAll('[data-i18n-aria]').forEach(el => el.setAttribute('aria-label', t(el.dataset.i18nAria)));
-    renderAuthText(); renderTransferMode(); renderLimits(); renderAccount(); renderRecipients(); renderHistory(); renderAudit(); renderDetails(); $('auditToggle').textContent = t($('auditPanel').classList.contains('hidden') ? 'auditLog' : 'hideAuditLog');
+    renderAuthText(); renderTransferMode(); renderLimits(); renderAccount(); renderRecipients(); renderHistory(); renderAudit(); renderDetails(); $('auditToggle').textContent = t(currentBankView === 'overview' && !$('auditPanel').classList.contains('hidden') ? 'hideAuditLog' : 'auditLog');
     for (const id of notices.keys()) renderNotice($(id)); document.querySelectorAll('input,select,textarea').forEach(localizeValidity); document.dispatchEvent(new Event('languagechange'));
   }
   function setLanguage(value) { language = Object.hasOwn(I18N, value) ? value : 'en'; try { localStorage.setItem(LANGUAGE_STORAGE_KEY, language); } catch {} applyLanguage(); }
@@ -1126,6 +1160,15 @@
   $('profileForm').onsubmit = async event => { event.preventDefault(); const button = $('saveProfile'); button.disabled = true; try { const result = await api('/api/profile', {method:'POST', body:JSON.stringify({name:$('profileName').value.trim(), email:$('profileEmail').value.trim(), phone:$('profilePhone').value.trim(), currentPassword:$('profileCurrentPassword').value})}); currentUser = result.user; $('profileCurrentPassword').value = ''; syncUserIdentity(); await loadAccounts(); $('profileDialog').close(); notice($('notice'), msg('profileSaved'), 'success'); } catch (error) { reportError($('profileNotice'), error); } finally { button.disabled = false; } };
   $('deleteAccountForm').onsubmit = async event => { event.preventDefault(); const button = $('confirmDeleteAccount'); button.disabled = true; try { await api('/api/account/delete', {method:'POST', body:JSON.stringify({password:$('deletePassword').value, confirmation:$('deleteConfirmation').value})}); resetBankState(); $('deletePassword').value = ''; $('deleteConfirmation').value = ''; showAuth('login'); notice($('authNotice'), msg('accountDeleted'), 'success'); } catch (error) { reportError($('deleteNotice'), error); } finally { button.disabled = false; } };
   $('loginTab').onclick = () => showAuth('login'); $('registerTab').onclick = () => showAuth('register'); $('forgotButton').onclick = showPasswordChange; $('backToLogin').onclick = () => showAuth('login'); $('backToLoginFromReset').onclick = () => showAuth('login');
+  const bankTabs = ['overviewTab','statisticsTab'].map($);
+  bankTabs.forEach((tab, index) => {
+    tab.onclick = () => setBankView(tab.dataset.bankView);
+    tab.addEventListener('keydown', event => {
+      const target = {ArrowRight:(index + 1) % bankTabs.length, ArrowLeft:(index + bankTabs.length - 1) % bankTabs.length, Home:0, End:bankTabs.length - 1}[event.key];
+      if (target === undefined) return;
+      event.preventDefault(); bankTabs[target].focus(); setBankView(bankTabs[target].dataset.bankView);
+    });
+  });
   $('authForm').onsubmit = async event => {
     event.preventDefault(); const button = $('authButton'); button.disabled = true;
     try { const body = {email:$('authEmail').value.trim(), password:$('authPassword').value}; if (authMode === 'register') { body.name = $('authName').value.trim(); body.phone = $('authPhone').value.trim(); body.passwordConfirmation = $('authPasswordConfirm').value; } const result = await api('/api/' + (authMode === 'login' ? 'login' : 'register'), {method:'POST', body:JSON.stringify(body)}); csrfToken = result.csrfToken; await openBank(result.user); } catch (error) { reportError($('authNotice'), error); } finally { button.disabled = false; }
@@ -1141,7 +1184,7 @@
     catch (error) { reportError($('authNotice'), error); } finally { button.disabled = false; }
   };
   $('logoutButton').onclick = async () => { const request = api('/api/logout', {method:'POST', body:'{}'}); resetBankState(); showAuth('login'); $('authButton').disabled = true; try { await request; } catch {} finally { $('authButton').disabled = false; } };
-  $('auditToggle').onclick = async () => { const panel = $('auditPanel'), opening = panel.classList.contains('hidden'); panel.classList.toggle('hidden', !opening); $('auditToggle').textContent = t(opening ? 'hideAuditLog' : 'auditLog'); if (opening) { try { await loadAudit(); } catch (error) { reportError($('notice'), error); } } };
+  $('auditToggle').onclick = async () => { if (currentBankView === 'statistics') { setBankView('overview'); $('auditPanel').classList.add('hidden'); } const panel = $('auditPanel'), opening = panel.classList.contains('hidden'); panel.classList.toggle('hidden', !opening); $('auditToggle').textContent = t(opening ? 'hideAuditLog' : 'auditLog'); if (opening) { try { await loadAudit(); } catch (error) { reportError($('notice'), error); } } };
   ['historySearch','historyFrom','historyTo','historyMin','historyMax'].forEach(id => $(id).addEventListener('input', renderHistory)); $('historyStatus').addEventListener('change', renderHistory);
   $('clearHistoryFilters').onclick = () => { ['historySearch','historyStatus','historyFrom','historyTo','historyMin','historyMax'].forEach(id => { $(id).value = ''; localizeValidity($(id)); }); renderHistory(); };
   $('accountSelect').onchange = () => { currentId = Number($('accountSelect').value); clearForNew(); renderAccount(); };

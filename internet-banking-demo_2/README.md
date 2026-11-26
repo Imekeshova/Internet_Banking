@@ -90,6 +90,8 @@ Defaults can be changed with environment variables before launching the server:
 
 ## Languages and Transfer Statistics
 
+After sign-in, the top navigation separates **Overview** (balance, transfer form and history) from **Statistics** (weekly/monthly totals and monthly highlights). Switching tabs preserves entered form values and filters. Both tabs are translated into EN/RU/KK and support arrow keys, Home and End. Statistics load when opened, refresh while visible and retain the last valid result between tabs; signing out clears the data and resets navigation to Overview. Transfer details and personal information remain accessible from Statistics.
+
 The EN / RU / KK buttons switch languages in one click before and after sign-in. English (`en`), Russian (`ru`), and Kazakh (`kk`) cover the main forms, transfer statuses, errors, history, details and receipts. The choice is saved in the current browser. Names and notes entered by users are kept as written. Currency remains KZT; displayed operation times and scheduling use UTC+5. Kazakh month names have an explicit fallback for browsers with incomplete locale data.
 
 Scheduled transfers and history filters use the application's own localized date controls, so the browser's language cannot supply a conflicting date placeholder or calendar. English shows `DD/MM/YYYY` (with `HH:mm` for scheduling); Russian and Kazakh show day-month-year separated by dots, with localized placeholder letters, month/day names and actions. Dates can be typed or selected from the calendar. Changing language preserves the chosen day and time. Internally, filters compare ISO dates and scheduling sends `YYYY-MM-DDTHH:mm`, still interpreted as UTC+5. Impossible dates and incomplete times are rejected; the calendar supports arrow keys, Escape, Apply and Clear.
@@ -139,6 +141,7 @@ For older completed records, migration uses an available successful audit event 
 | UI-01 | Layout works on desktop and phone | Cards, forms and actions remain readable at desktop and 390px phone width in all languages. |
 | UI-02 | Statistics refresh preserves keyboard position | Focus the smallest-transfer detail button when smallest and largest are the same transfer; refreshing or changing language keeps focus on that same button. |
 | UI-03 | Background polling keeps unchanged actions usable | Focus Cancel in a scheduled-transfer notice or a history row; polling keeps the existing button. A translated notice restores focus to the same action. |
+| UI-04 | Top navigation separates Overview and Statistics without losing work | Fill a transfer and history filter, open Statistics, change language and return. Values remain; one tab/panel is selected. Verify keyboard navigation, details, refresh after a successful transfer, and fresh Overview after another user signs in. |
 
 ### Field Mapping: Form → API → Database
 

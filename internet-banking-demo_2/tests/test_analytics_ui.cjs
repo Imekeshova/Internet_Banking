@@ -55,29 +55,30 @@ function dashboard() {
     querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
   }
 
-  let hidden = true;
+  let hidden = true, statisticsHidden = true;
   let observer;
   let panel;
   const email = { textContent: '' };
   const bank = {
     classList: { contains: name => name === 'hidden' && hidden },
-    querySelector: selector => {
-      assert.equal(selector, '.greeting');
-      return { after: element => { panel = element; } };
-    },
+  };
+  const statisticsView = {
+    classList: { contains: name => name === 'hidden' && statisticsHidden },
+    children: [],
+    append(element) { panel = element; this.children.push(element); },
   };
   document.createElement = () => new Element();
-  document.getElementById = id => ({ bankView: bank, userEmail: email, analyticsPanel: panel })[id]
+  document.getElementById = id => ({ bankView: bank, statisticsPanel: statisticsView, userEmail: email, analyticsPanel: panel })[id]
     || panel?.querySelector('#' + id);
 
-  const requests = [];
+  const requests = [], timers = [];
   const I18N = { en: {}, ru: {}, kk: {} };
   const escape = value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;').replaceAll('"', '&quot;');
   const context = vm.createContext({
     document, I18N, AbortController, Event,
     MutationObserver: class { constructor(callback) { observer = callback; } observe() {} },
-    setInterval: () => 1,
+    setInterval: callback => timers.push(callback),
     esc: escape,
     money: amount => `${Number(amount).toFixed(2)} KZT`,
     date: value => value,
@@ -93,13 +94,17 @@ function dashboard() {
   vm.runInContext(source, context);
 
   return {
-    panel, document, requests,
+    panel, document, requests, statisticsView,
     fire(type) { document.dispatchEvent(new Event(type)); },
-    signIn(identity) { email.textContent = identity; hidden = false; observer(); },
+    tick() { for (const callback of timers) callback(); },
+    signIn(identity) { email.textContent = identity; hidden = false; statisticsHidden = true; observer(); },
+    showStatistics() { statisticsHidden = false; document.dispatchEvent(new Event('bankviewchange')); },
+    showOverview() { statisticsHidden = true; document.dispatchEvent(new Event('bankviewchange')); },
     signOut() {
       document.dispatchEvent(new Event('banksessionchange'));
       email.textContent = '';
       hidden = true;
+      statisticsHidden = true;
       observer();
     },
     async resolve(index, data) { requests[index].resolve(data); await settle(); },
@@ -121,6 +126,7 @@ function statistics(total, recipient = 'Recipient') {
 test('Signing out clears analytics and ignores a late successful response', async () => {
   const app = dashboard();
   app.signIn('first@example.test');
+  app.showStatistics();
   assert.equal(app.requests.length, 1);
   app.signOut();
   assert.equal(app.requests[0].signal.aborted, true);
@@ -133,8 +139,10 @@ test('Signing out clears analytics and ignores a late successful response', asyn
 test('A prior user response cannot overwrite the next user statistics', async () => {
   const app = dashboard();
   app.signIn('first@example.test');
+  app.showStatistics();
   app.signOut();
   app.signIn('second@example.test');
+  app.showStatistics();
   assert.equal(app.requests.length, 2);
   await app.resolve(1, statistics(200, 'Second recipient'));
   await app.resolve(0, statistics(999, 'Private first recipient'));
@@ -147,6 +155,7 @@ test('A prior user response cannot overwrite the next user statistics', async ()
 test('Refresh failure preserves the last totals and successful recovery removes the warning', async () => {
   const app = dashboard();
   app.signIn('first@example.test');
+  app.showStatistics();
   await app.resolve(0, statistics(1200));
   app.fire('bankrefresh');
   await app.reject(1);
@@ -161,6 +170,7 @@ test('Refresh failure preserves the last totals and successful recovery removes 
 test('Smallest detail keeps keyboard focus when largest refers to the same transfer', async () => {
   const app = dashboard();
   app.signIn('first@example.test');
+  app.showStatistics();
   await app.resolve(0, statistics(100));
   const smallest = app.panel.querySelector('#statSmallestDetail');
   assert.ok(smallest, 'The smallest transfer must have an independently focusable button');
@@ -172,4 +182,74 @@ test('Smallest detail keeps keyboard focus when largest refers to the same trans
   app.document.documentElement.lang = 'ru';
   app.fire('languagechange');
   assert.equal(app.document.activeElement?.id, 'statSmallestDetail');
+});
+
+test('Overview does not request analytics until the Statistics tab is opened', async () => {
+  const app = dashboard();
+  app.signIn('first@example.test');
+  app.fire('bankready');
+  app.fire('bankrefresh');
+  app.fire('visibilitychange');
+  app.tick();
+  assert.equal(app.requests.length, 0);
+  assert.equal(app.panel.innerHTML, '');
+  assert.deepEqual(app.statisticsView.children, [app.panel], 'Statistics must live inside its tab panel');
+  app.showStatistics();
+  assert.equal(app.requests.length, 1);
+  assert.ok(app.panel.innerHTML.includes('Loading statistics'));
+  await app.resolve(0, statistics(1500));
+  assert.ok(app.panel.innerHTML.includes('1500.00 KZT'));
+});
+
+test('Overview pauses analytics polling and returning shows translated cache before refreshing', async () => {
+  const app = dashboard();
+  app.signIn('first@example.test');
+  app.showStatistics();
+  await app.resolve(0, statistics(1200));
+  const previousMarkup = app.panel.innerHTML;
+  app.showOverview();
+  app.document.documentElement.lang = 'ru';
+  app.fire('languagechange');
+  app.fire('bankrefresh');
+  app.fire('bankready');
+  app.fire('visibilitychange');
+  app.tick();
+  assert.equal(app.requests.length, 1, 'Hidden Statistics must not make background requests');
+  assert.equal(app.panel.innerHTML, previousMarkup, 'Leaving the tab must preserve its cached figures');
+  app.showStatistics();
+  assert.equal(app.requests.length, 2, 'Returning must fetch fresh figures');
+  assert.ok(app.panel.innerHTML.includes('Ваши переводы'));
+  assert.ok(app.panel.innerHTML.includes('1200.00 KZT'), 'Cached figures remain visible during refresh');
+  await app.resolve(1, statistics(2300));
+  assert.ok(app.panel.innerHTML.includes('2300.00 KZT'));
+});
+
+test('A response received on Overview updates the cache without leaving requests stuck', async () => {
+  const app = dashboard();
+  app.signIn('first@example.test');
+  app.showStatistics();
+  const loadingMarkup = app.panel.innerHTML;
+  app.showOverview();
+  await app.resolve(0, statistics(1750));
+  assert.equal(app.panel.innerHTML, loadingMarkup, 'A hidden panel should not rerender');
+  app.showStatistics();
+  assert.ok(app.panel.innerHTML.includes('1750.00 KZT'), 'The completed response must be available immediately');
+  assert.equal(app.requests.length, 2, 'The completed hidden request must release the pending guard');
+  await app.resolve(1, statistics(1800));
+  assert.ok(app.panel.innerHTML.includes('1800.00 KZT'));
+});
+
+test('Opening Statistics for another identity clears the previous cache before displaying anything', async () => {
+  const app = dashboard();
+  app.signIn('first@example.test');
+  app.showStatistics();
+  await app.resolve(0, statistics(999, 'Private first recipient'));
+  // Also guard an identity change even if the separate session-reset event was missed.
+  app.signIn('second@example.test');
+  app.showStatistics();
+  assert.equal(app.requests.length, 2);
+  assert.ok(!app.panel.innerHTML.includes('999.00 KZT'));
+  assert.ok(!app.panel.innerHTML.includes('Private first recipient'));
+  await app.resolve(1, statistics(200, 'Second recipient'));
+  assert.ok(app.panel.innerHTML.includes('Second recipient'));
 });

@@ -40,18 +40,20 @@ Object.assign(I18N.kk, {
 
 (() => {
   const bank = document.getElementById('bankView');
+  const statisticsView = document.getElementById('statisticsPanel');
   const panel = document.createElement('section');
   panel.id = 'analyticsPanel';
   panel.className = 'analytics-panel';
   panel.setAttribute('aria-labelledby', 'analyticsTitle');
-  bank.querySelector('.greeting').after(panel);
+  statisticsView.append(panel);
   let data = null;
   let failed = false;
   let generation = 0;
   let pending = false;
   let controller = null;
   let owner = '';
-  const visible = () => !bank.classList.contains('hidden');
+  const signedIn = () => !bank.classList.contains('hidden');
+  const visible = () => signedIn() && !statisticsView.classList.contains('hidden');
   const identity = () => document.getElementById('userEmail').textContent;
 
   function highlight(transfer, title, buttonId) {
@@ -117,15 +119,23 @@ Object.assign(I18N.kk, {
     if (!data) render();
     try {
       const result = await api('/api/analytics', {signal: controller.signal});
-      if (requestGeneration !== generation || !visible() || identity() !== requestOwner) return;
+      if (requestGeneration !== generation || !signedIn() || identity() !== requestOwner) return;
       data = result;
       failed = false;
     } catch (error) {
-      if (requestGeneration !== generation || !visible() || identity() !== requestOwner) return;
+      if (requestGeneration !== generation || !signedIn() || identity() !== requestOwner) return;
       if (error.name !== 'AbortError') failed = true;
     } finally {
       if (requestGeneration === generation) { pending = false; render(); }
     }
+  }
+
+  function viewChanged() {
+    if (!visible()) return;
+    // Never briefly render a previous user's cached result when opening the tab.
+    if (owner !== identity()) { reset(); owner = identity(); }
+    render();
+    load();
   }
 
   panel.addEventListener('click', event => {
@@ -135,8 +145,9 @@ Object.assign(I18N.kk, {
   document.addEventListener('languagechange', render);
   document.addEventListener('bankrefresh', load);
   document.addEventListener('bankready', load);
+  document.addEventListener('bankviewchange', viewChanged);
   document.addEventListener('banksessionchange', reset);
-  new MutationObserver(() => { if (visible()) load(); else reset(); })
+  new MutationObserver(() => { if (!signedIn()) reset(); else if (visible()) viewChanged(); })
     .observe(bank, {attributes: true, attributeFilter: ['class']});
   // Also refresh after a calendar boundary or when a background tab becomes active.
   document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });

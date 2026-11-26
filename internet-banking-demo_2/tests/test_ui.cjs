@@ -145,8 +145,9 @@ function appHarness(now = Date.parse('2026-11-25T10:20:59Z')) {
     dispatchEvent: event => events.push(event.type),
     querySelectorAll(selector) {
       if (selector === 'input,select,textarea') return elements.filter(node => ['INPUT','SELECT','TEXTAREA'].includes(node.tagName));
-      if (selector === '#authForm input') return ['authName','authEmail','authPassword','authPasswordConfirm'].map(id => byId.get(id));
-      if (selector === '#passwordResetForm input') return ['resetEmail','oldPassword','newPassword','newPasswordConfirm'].map(id => byId.get(id));
+      if (selector === '#authForm input') return ['authName','authPhone','authEmail','authPassword','authPasswordConfirm'].map(id => byId.get(id));
+      if (selector === '#passwordResetForm input') return ['newPassword','newPasswordConfirm'].map(id => byId.get(id));
+      if (selector === '#passwordResetRequestForm input') return ['resetEmail'].map(id => byId.get(id));
       const attribute = selector.match(/^\[([^\]]+)\]$/)?.[1];
       return attribute ? elements.filter(node => node.getAttribute(attribute) !== undefined) : [];
     },
@@ -161,6 +162,13 @@ function appHarness(now = Date.parse('2026-11-25T10:20:59Z')) {
   const setupEnd = script.indexOf("document.querySelectorAll('[data-language]').forEach(button => { button.onclick");
   assert.ok(setupEnd > 0, 'App setup boundary must exist');
   vm.runInContext(script.slice(0, setupEnd), sandbox);
+  // The app now declares this helper between event bindings. Function hoisting
+  // exposes it to the whole browser script; retain that behavior in this harness.
+  if (vm.runInContext('typeof dateFieldValue', sandbox) === 'undefined') {
+    const helper = script.slice(setupEnd).match(/  function dateFieldValue\(input\) \{[\s\S]*?\n  \}/);
+    assert.ok(helper, 'The real date field helper must exist');
+    vm.runInContext(helper[0], sandbox);
+  }
   return {get: id => byId.get(id), run: code => vm.runInContext(code, sandbox), document, storage, events};
 }
 
@@ -183,6 +191,79 @@ test('Switching language preserves entered transfer data and canonical filter va
   }
   app.run("setLanguage('unsupported')");
   assert.equal(app.document.documentElement.lang, 'en');
+});
+
+test('Overview and Statistics tabs expose one selected tab and its matching panel', () => {
+  const app = appHarness();
+  for (const selected of ['overview', 'statistics', 'overview']) {
+    app.run(`setBankView('${selected}')`);
+    assert.equal(app.run('currentBankView'), selected);
+    for (const view of ['overview', 'statistics']) {
+      assert.equal(app.get(`${view}Panel`).classList.contains('hidden'), view !== selected);
+      assert.equal(app.get(`${view}Tab`).getAttribute('aria-selected'), String(view === selected));
+      assert.equal(app.get(`${view}Tab`).tabIndex, view === selected ? 0 : -1);
+    }
+  }
+  assert.ok(app.events.includes('bankviewchange'), 'Analytics must be notified when its tab becomes visible');
+  app.run("setBankView('unknown')");
+  assert.equal(app.run('currentBankView'), 'overview');
+  assert.equal(app.get('overviewPanel').classList.contains('hidden'), false);
+  assert.equal(app.get('statisticsPanel').classList.contains('hidden'), true);
+});
+
+test('Switching dashboard tabs preserves form controls, entered data and history filters', () => {
+  const app = appHarness();
+  const entered = {
+    amount:'1250.50', description:'На подарок', recipient:'3', recipientPhone:'+7 701 234 56 78',
+    transferMode:'scheduled', scheduledFor:'27/11/2026 14:30',
+    historySearch:'Amina', historyStatus:'Completed', historyFrom:'25/11/2026',
+    historyTo:'27/11/2026', historyMin:'100', historyMax:'5000',
+  };
+  const originalControls = new Map();
+  for (const [id, value] of Object.entries(entered)) {
+    app.get(id).value = value;
+    originalControls.set(id, app.get(id));
+  }
+  const historyWrites = app.get('historyBody').htmlWrites;
+  for (const view of ['statistics', 'overview', 'statistics', 'overview']) {
+    app.run(`setBankView('${view}')`);
+    for (const [id, value] of Object.entries(entered)) {
+      assert.equal(app.get(id), originalControls.get(id), `${id}: control was replaced`);
+      assert.equal(app.get(id).value, value, `${id}: entered data changed`);
+    }
+  }
+  assert.equal(app.get('historyBody').htmlWrites, historyWrites, 'Tab switching must not rebuild history');
+});
+
+test('Language switching translates navigation while keeping the active Statistics tab', () => {
+  const app = appHarness();
+  app.run("setBankView('statistics')");
+  for (const language of ['ru','kk','en']) {
+    app.run(`setLanguage('${language}')`);
+    assert.equal(app.run('currentBankView'), 'statistics');
+    assert.equal(app.get('statisticsPanel').classList.contains('hidden'), false);
+    assert.equal(app.get('overviewPanel').classList.contains('hidden'), true);
+    assert.equal(app.get('statisticsTab').getAttribute('aria-selected'), 'true');
+    assert.equal(app.get('overviewTab').textContent, catalog[language].overviewTab);
+    assert.equal(app.get('statisticsTab').textContent, catalog[language].statisticsTab);
+    assert.equal(app.get('bankNavigation').getAttribute('aria-label'), catalog[language].bankNavigation);
+  }
+});
+
+test('Signing in opens Overview and signing out hides and resets bank navigation', async () => {
+  const app = appHarness();
+  app.run("setBankView('statistics'); showAuth('login')");
+  assert.equal(app.run('currentBankView'), 'overview');
+  assert.equal(app.get('bankNavigation').classList.contains('hidden'), true);
+  app.run("loadAccounts = async () => {}; loadRecipients = async () => {}; loadLimits = async () => {};");
+  await app.run("openBank({email:'malika@example.test',name:'Malika',role:'customer'})");
+  assert.equal(app.run('currentBankView'), 'overview');
+  assert.equal(app.get('bankNavigation').classList.contains('hidden'), false);
+  assert.equal(app.get('overviewPanel').classList.contains('hidden'), false);
+  app.run("setBankView('statistics'); resetBankState(); showAuth('login')");
+  assert.equal(app.run('currentBankView'), 'overview');
+  assert.equal(app.get('bankNavigation').classList.contains('hidden'), true);
+  assert.equal(app.get('bankView').classList.contains('hidden'), true);
 });
 
 test('Immediate transfers disable the hidden scheduled date constraint', () => {

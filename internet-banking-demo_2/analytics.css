@@ -3,6 +3,15 @@
 @media(max-width:520px){.analytics-panel{margin-bottom:20px}.analytics-heading h2{font-size:18px}.analytics-heading p{font-size:11px}.stat-totals{gap:9px}.stat-total{padding:14px 12px}.stat-total-amount{font-size:21px}.stat-label{font-size:11px}.stat-total-meta{font-size:10px}.stat-highlights{gap:9px}.stat-highlight{padding:14px 12px}.stat-amount{font-size:18px}.stats-foot{flex-direction:column;gap:3px}.stat-count{white-space:normal;text-align:right;max-width:92px}.stat-period{margin-top:14px}}
 
 /* Keep the original green identity, with room for longer translated labels. */
+.bank-navigation{background:#fff;border-bottom:1px solid var(--line);padding:0 max(24px,calc((100vw - 1160px)/2))}
+.bank-tabs{display:flex;gap:24px;align-items:center}
+.bank-tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;background:transparent;color:var(--muted);padding:14px 4px 12px;font-size:14px;font-weight:650;min-height:48px}
+.bank-tabs button:hover{color:var(--green)}
+.bank-tabs button[aria-selected="true"]{border-bottom-color:var(--green);color:var(--green)}
+#statisticsPanel .analytics-panel{margin-bottom:0}
+#statisticsPanel .analytics-heading h2{font-size:27px;letter-spacing:-.7px}
+#statisticsPanel .analytics-heading{margin-bottom:22px}
+@media(max-width:520px){.bank-navigation{padding:0 17px}.bank-tabs{gap:22px}.bank-tabs button{font-size:13px}#statisticsPanel .analytics-heading h2{font-size:23px}}
 .layout>div,.transfer-card{min-width:0}
 .transfer-card{align-self:start}
 .sectionhead{align-items:flex-start;gap:12px}
